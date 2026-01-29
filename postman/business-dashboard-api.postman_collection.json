@@ -1,0 +1,300 @@
+{
+  "info": {
+    "_postman_id": "a2992204-b088-4ef7-ac4e-ce7c4b36e05e",
+    "name": "business-dashboard-api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "50752374",
+    "_collection_link": "https://go.postman.co/collection/50752374-a2992204-b088-4ef7-ac4e-ce7c4b36e05e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "user",
+      "item": [
+        {
+          "name": "createUser",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\": \"Karan\",\r\n    \"email\": \"karan@example.com\",\r\n    \"password\": \"123456\",\r\n    \"role\": \"user\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/users/createUser",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "createUser"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getUser",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/users/getUser",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "getUser"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "loginUser",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\": \"Karan\",\r\n    \"email\": \"karan@example.com\",\r\n    \"password\": \"123456\",\r\n    \"role\": \"user\"\r\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/users/loginUser",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "loginUser"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "customer",
+      "item": [
+        {
+          "name": "createCustomer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/customer",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "customer"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getCustomer",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "updateCustomer",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/customers/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "deleteCustomer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzhmNjgxZWM3ZmRlMmY2Nzg1ZTMwMyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY5NjE5NDIzLCJleHAiOjE3Njk3MDU4MjN9.EKOyTEIHTyWhki0da0y_PxBwKeWdfGzqA6YkRX1k7Nk",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/customer/697abf167b3ea74d001ac56",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "697abf167b3ea74d001ac56"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "restoreCustomer",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "product",
+      "item": [
+        {
+          "name": "createProduct",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "localshost:3000/api/product/",
+              "host": [
+                "localshost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "product",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getOrder",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "order",
+      "item": [
+        {
+          "name": "createOrder",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/orders",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getOrder",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "updateOrderStatus",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2FjYTUyMDIwMzNlYTA5YmQ1YzdiMSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc2OTY2NzkzOSwiZXhwIjoxNzY5NzU0MzM5fQ.-Cr8zPELG2jgYHayQujWMXb1BiI6c0bFjcf4CZT2Fnc",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"status\":\"paid\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:3000/api/orders/697b367f1273798fa7e13a2a/status",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "orders",
+                "697b367f1273798fa7e13a2a",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getSalesSummary",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "getMonthlySales",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
