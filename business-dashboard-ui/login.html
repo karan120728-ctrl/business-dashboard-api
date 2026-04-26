@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | FlowOps</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="auth-body">
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>FlowOps</h2>
+            <p>Welcome back! Please login to your account.</p>
+        </div>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" class="input" required placeholder="admin@flowops.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" class="input" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="btn-login-submit">Sign In</button>
+        </form>
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+            Don't have an account? <a href="register.html" style="color: var(--primary); text-decoration: none;">Register here</a>
+        </p>
+
+            <div class="login-shortcuts" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <p style="text-align: center; color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem;">Experience the RBX (Role-Based Experience)</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="quickLogin('admin@flowops.com', 'admin123')"><i class="fa-solid fa-user-shield"></i> Admin</button>
+                    <button class="btn btn-secondary btn-sm" onclick="quickLogin('driver@flowops.com', 'driver123')"><i class="fa-solid fa-truck"></i> Driver</button>
+                    <button class="btn btn-secondary btn-sm" onclick="quickLogin('customer@flowops.com', 'customer123')"><i class="fa-solid fa-user-tag"></i> Customer</button>
+                </div>
+            </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api/base.js"></script>
+    <script>
+        async function quickLogin(email, pass) {
+            document.getElementById('email').value = email;
+            document.getElementById('password').value = pass;
+            document.getElementById('login-form').dispatchEvent(new Event('submit'));
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('btn-login-submit');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Signing in...';
+
+            try {
+                const response = await fetch(`${window.API_URL}/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('flowops_token', data.token);
+                    localStorage.setItem('flowops_user', JSON.stringify(data.user));
+                    window.location.href = 'index.html';
+                } else {
+                    showToast(data.message || 'Login failed', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Is the server running?', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Sign In';
+            }
+        });
+    </script>
+</body>
+</html>

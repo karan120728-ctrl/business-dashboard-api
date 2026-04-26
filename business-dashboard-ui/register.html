@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | FlowOps</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .role-toggle {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            background: var(--secondary);
+            padding: 0.25rem;
+            border-radius: var(--radius-md);
+        }
+        .role-btn {
+            flex: 1;
+            padding: 0.5rem;
+            text-align: center;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .role-btn.active {
+            background: var(--bg-card);
+            box-shadow: var(--shadow-sm);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body class="auth-body">
+    <div id="toast-container" class="toast-container"></div>
+
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Join FlowOps</h2>
+            <p>Create your account to get started.</p>
+        </div>
+
+        <div class="role-toggle">
+            <div class="role-btn active" data-role="customer" onclick="setRole('customer')">Customer</div>
+            <div class="role-btn" data-role="driver" onclick="setRole('driver')">Driver</div>
+            <div class="role-btn" data-role="admin" onclick="setRole('admin')">Admin</div>
+        </div>
+
+        <form id="register-form">
+            <input type="hidden" id="role" value="customer">
+            
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" class="input" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" class="input" required placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" class="input" required placeholder="••••••••" minlength="6">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="btn-register-submit">Create Account</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+            Already have an account? <a href="login.html" style="color: var(--primary); text-decoration: none;">Sign in here</a>
+        </p>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        function setRole(role) {
+            document.getElementById('role').value = role;
+            document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.role-btn[data-role="${role}"]`).classList.add('active');
+        }
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            const btn = document.getElementById('btn-register-submit');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Creating account...';
+
+            try {
+                // The API endpoint in user.route.js is /createUser
+                const response = await fetch(`${window.API_URL}/users/createUser`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password, role })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showToast('Account created successfully! Please log in.', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1500);
+                } else {
+                    showToast(data.message || 'Registration failed', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Is the server running?', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Create Account';
+            }
+        });
+    </script>
+</body>
+</html>

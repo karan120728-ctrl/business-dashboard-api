@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowOps | SaaS Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js for Live Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Are you sure?</h3>
+            <p id="confirm-msg">This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button id="btn-cancel-confirm" class="btn btn-secondary">Cancel</button>
+                <button id="btn-confirm" class="btn btn-danger">Yes, Proceed</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Customer Modal -->
+    <div id="modal-customer" class="modal hidden modal-form">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3>Add Customer</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-customer">
+                <div class="form-group">
+                    <label>Name <span class="error-text hidden" id="err-cust-name">Required</span></label>
+                    <input type="text" id="cust-name" class="input" placeholder="e.g. Acme Corp">
+                </div>
+                <div class="form-group">
+                    <label>Email <span class="error-text hidden" id="err-cust-email">Invalid email</span></label>
+                    <input type="email" id="cust-email" class="input" placeholder="contact@acme.com">
+                </div>
+                <div class="form-group">
+                    <label>Phone (Optional)</label>
+                    <input type="text" id="cust-phone" class="input" placeholder="555-0199">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-customer">Save Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Product Modal -->
+    <div id="modal-product" class="modal hidden modal-form">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3>Add Product</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-product">
+                <div class="form-group">
+                    <label>Product Name <span class="error-text hidden" id="err-prod-name">Required</span></label>
+                    <input type="text" id="prod-name" class="input" placeholder="e.g. Pro Plan">
+                </div>
+                <div class="form-group">
+                    <label>Price ($) <span class="error-text hidden" id="err-prod-price">Must be > 0</span></label>
+                    <input type="number" step="0.01" id="prod-price" class="input" placeholder="99.99">
+                </div>
+                <div class="form-group">
+                    <label>Description (Optional)</label>
+                    <input type="text" id="prod-desc" class="input">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-product">Save Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Order Modal -->
+    <div id="modal-order" class="modal hidden modal-form">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3>Create Order</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-order">
+                <div class="form-group">
+                    <label>Customer <span class="error-text hidden" id="err-order-cust">Required</span></label>
+                    <select id="order-customer" class="input">
+                        <option value="">Select Customer...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Product <span class="error-text hidden" id="err-order-prod">Required</span></label>
+                    <select id="order-product" class="input">
+                        <option value="" data-price="0">Select Product...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity <span class="error-text hidden" id="err-order-qty">Must be > 0</span></label>
+                    <input type="number" id="order-qty" class="input" value="1" min="1">
+                </div>
+                <div class="form-group" style="background: var(--bg-main); padding: 1rem; border-radius: var(--radius-md); text-align: right;">
+                    <p style="color: var(--text-muted); font-size: 0.875rem;">Total Amount</p>
+                    <h2 id="order-total-preview" style="color: var(--primary);">$0.00</h2>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-order">Create Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="modal-user" class="modal hidden modal-form">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3>Add User</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-user">
+                <div class="form-group">
+                    <label>Name <span class="error-text hidden" id="err-user-name">Required</span></label>
+                    <input type="text" id="user-name" class="input">
+                </div>
+                <div class="form-group">
+                    <label>Email <span class="error-text hidden" id="err-user-email">Invalid email</span></label>
+                    <input type="email" id="user-email" class="input">
+                </div>
+                <div class="form-group">
+                    <label>Password <span class="error-text hidden" id="err-user-pass">Min 6 chars</span></label>
+                    <input type="password" id="user-password" class="input">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="user-role" class="input">
+                        <option value="customer">Customer</option>
+                        <option value="driver">Driver</option>
+                        <option value="admin">Admin</option>
+                        <option value="superadmin">SuperAdmin</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-user">Save User</button>
+                </div>
+            </form>
+        </div>
+
+    <!-- Edit User Role Modal -->
+    <div id="modal-edit-user" class="modal hidden modal-form">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3>Change User Role</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-edit-user">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="edit-user-role" class="input">
+                        <option value="customer">Customer</option>
+                        <option value="driver">Driver</option>
+                        <option value="admin">Admin</option>
+                        <option value="superadmin">SuperAdmin</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-update-user">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+
+    <!-- Layout -->
+    <div id="app-layout" class="layout hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-layer-group logo-icon"></i>
+                <h2>FlowOps</h2>
+            </div>
+            <p class="sidebar-tagline">Manage everything in one place.</p>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-view="dashboard" id="dashboard-link"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+                <a href="#" class="nav-link" data-view="customers" id="customers-link"><i class="fa-solid fa-users"></i> Customers</a>
+                <a href="#" class="nav-link" data-view="products" id="products-link"><i class="fa-solid fa-box"></i> Products</a>
+                <a href="#" class="nav-link" data-view="orders" id="orders-link"><i class="fa-solid fa-shopping-cart"></i> Orders</a>
+                <a href="#" class="nav-link admin-only hidden" data-view="users" id="users-link"><i class="fa-solid fa-user-shield"></i> Users</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button id="mobile-menu-btn" class="icon-btn"><i class="fa-solid fa-bars"></i></button>
+                    <h1 id="page-title">Dashboard</h1>
+                </div>
+                <div class="topbar-right">
+                    <!-- Notification Bell -->
+                    <div class="notification-dropdown-wrapper">
+                        <div class="notification-trigger" id="notification-trigger">
+                            <i class="fa-solid fa-bell"></i>
+                            <span class="notification-badge hidden" id="notification-count">0</span>
+                        </div>
+                        <div class="dropdown-menu hidden" id="notification-dropdown-menu">
+                            <div class="dropdown-header">
+                                <h3>Notifications</h3>
+                                <button id="btn-read-all" class="btn-text">Clear All</button>
+                            </div>
+                            <div id="notification-list" class="notification-list">
+                                <div class="empty-state">No new notifications</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="user-profile-dropdown">
+                        <div class="user-profile-trigger" id="profile-trigger">
+                            <div class="user-avatar">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div class="user-info-text">
+                                <span id="user-name-display" class="user-name">User</span>
+                                <span id="user-role-badge" class="badge badge-neutral" style="font-size: 0.65rem;">Role</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+                        </div>
+                        <div class="dropdown-menu hidden" id="profile-dropdown-menu">
+                            <a href="#" class="dropdown-item"><i class="fa-solid fa-user-gear"></i> Profile Settings</a>
+                            <a href="#" class="dropdown-item" id="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Views Container -->
+            <div id="views-container" class="content-area">
+                
+                <!-- Dashboard View -->
+                <section id="view-dashboard" class="view active">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fa-solid fa-bolt"></i></div>
+                            <div class="metric-data">
+                                <h3>Today's Revenue</h3>
+                                <p id="metric-today" class="skeleton-text">$0.00</p>
+                                <div class="growth-indicator" id="growth-today">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fa-solid fa-calendar-week"></i></div>
+                            <div class="metric-data">
+                                <h3>Weekly Revenue</h3>
+                                <p id="metric-weekly" class="skeleton-text">$0.00</p>
+                                <div class="growth-indicator" id="growth-weekly">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                            <div class="metric-data">
+                                <h3>Monthly Revenue</h3>
+                                <p id="metric-monthly" class="skeleton-text">$0.00</p>
+                                <div class="growth-indicator" id="growth-monthly">--</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fa-solid fa-chart-line"></i></div>
+                            <div class="metric-data">
+                                <h3>Total Revenue</h3>
+                                <p id="metric-revenue" class="skeleton-text">$0.00</p>
+                                <div class="growth-indicator growth-neutral">All time</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="charts-grid" style="margin-top: 1.5rem;">
+                        <div class="chart-card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3>Sales Overview</h3>
+                                <select id="sales-chart-period" class="input" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly" selected>Monthly</option>
+                                </select>
+                            </div>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="salesChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3>Order Status</h3>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="statusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Customers View -->
+                <section id="view-customers" class="view hidden">
+                    <div class="toolbar">
+                        <input type="text" id="search-customers" class="input search-input" placeholder="Search customers...">
+                        <button class="btn btn-primary" id="btn-add-customer"><i class="fa-solid fa-plus"></i> Add Customer</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customers-tbody">
+                                <!-- Skeletons / Rows injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Products View -->
+                <section id="view-products" class="view hidden">
+                    <div class="toolbar">
+                        <input type="text" id="search-products" class="input search-input" placeholder="Search products...">
+                        <button class="btn btn-primary" id="btn-add-product"><i class="fa-solid fa-plus"></i> Add Product</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Orders View -->
+                <section id="view-orders" class="view hidden">
+                    <div class="toolbar">
+                        <button class="btn btn-primary admin-only hidden" id="btn-create-order"><i class="fa-solid fa-plus"></i> Create Order</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Customer</th>
+                                    <th>Amount</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Change Status</th>
+                                    <th>Logistics</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Users View (Admin only) -->
+                <section id="view-users" class="view hidden">
+                    <div class="toolbar">
+                        <button class="btn btn-primary" id="btn-add-user"><i class="fa-solid fa-plus"></i> Add User</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <!-- Logistics Modals -->
+    <!-- Assign Driver Modal -->
+    <div id="assign-driver-modal" class="modal hidden">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-truck"></i> Assign Driver</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="assign-driver-form">
+                <input type="hidden" id="assign-driver-order-id">
+                <div class="form-group">
+                    <label>Select Driver</label>
+                    <select id="driver-selection" class="input">
+                        <option value="">Select Driver...</option>
+                    </select>
+                    <span id="err-driver-name" class="error-text hidden">Please select a driver</span>
+                </div>
+                <div class="form-group">
+                    <label>Vehicle Number</label>
+                    <input type="text" id="vehicle-number" class="input" placeholder="e.g., MH-12-AB-1234">
+                    <span id="err-vehicle-num" class="error-text hidden">Vehicle number is required</span>
+                </div>
+                <div style="background:rgba(79,70,229,0.08); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.85rem; color:var(--text-muted);">
+                    <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i>
+                    Once assigned, the driver's device will start sending live GPS location automatically.
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="assign-driver-submit">Assign & Start Delivery</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Driver Live Tracking Modal (shown on driver's device) -->
+    <div id="driver-tracking-modal" class="modal hidden">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-location-crosshairs"></i> Live GPS Tracking</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="tracking-order-id">
+            <div style="text-align:center; padding: 1rem 0;">
+                <div id="tracking-status-badge" style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(239,68,68,0.1); color:#ef4444; padding:0.5rem 1rem; border-radius:9999px; font-weight:600; margin-bottom:1rem;">
+                    <span style="width:8px; height:8px; background:#ef4444; border-radius:50%; display:inline-block;"></span>
+                    GPS Inactive
+                </div>
+                <div id="tracking-coords" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Waiting for GPS signal...</div>
+                <div id="tracking-accuracy" style="font-size:0.75rem; color:var(--text-muted); margin-bottom:1.5rem;"></div>
+            </div>
+            <div style="margin-bottom:1rem; display:flex; gap:0.5rem;">
+                <input type="text" id="manual-location-search" class="input" style="flex:1; padding:0.5rem;" placeholder="Wrong location? Type address here...">
+                <button type="button" id="btn-manual-search" class="btn btn-secondary btn-sm" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </div>
+            <div id="tracking-map" style="height:250px; border-radius:12px; overflow:hidden; margin-bottom:1rem;"></div>
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <div style="display:flex; gap:1rem;">
+                    <button id="btn-start-tracking" class="btn btn-primary" style="flex:1;"><i class="fa-solid fa-play"></i> Start Sending Location</button>
+                    <button id="btn-stop-tracking" class="btn btn-secondary" style="flex:1;" disabled><i class="fa-solid fa-stop"></i> Stop</button>
+                </div>
+                <button id="btn-open-google-maps" class="btn btn-neutral btn-block" style="background:#fff; border:1px solid #e2e8f0; display:none;">
+                    <img src="https://www.google.com/images/branding/product/ico/maps15_24dp.ico" style="width:16px;"> View on Google Maps
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submit Proof Modal (Camera) -->
+    <div id="submit-proof-modal" class="modal hidden">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-camera"></i> Delivery Proof</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="submit-proof-form" enctype="multipart/form-data">
+                <input type="hidden" id="submit-proof-order-id">
+                <div class="form-group">
+                    <label>Take or Upload Photo <span class="error-text hidden" id="err-proof">Required</span></label>
+                    <div id="camera-preview-container" style="width:100%; min-height:200px; background:#0f172a; border-radius:12px; overflow:hidden; display:flex; align-items:center; justify-content:center; margin-bottom:1rem; position:relative;">
+                        <video id="webcam-video" autoplay playsinline style="width:100%; display:none;"></video>
+                        <canvas id="capture-canvas" style="display:none;"></canvas>
+                        <div id="camera-placeholder" style="text-align:center; color:#64748b;">
+                            <i class="fa-solid fa-camera" style="font-size:3rem; margin-bottom:0.5rem; display:block;"></i>
+                            <p>Camera not started</p>
+                        </div>
+                        <img id="proof-preview-img" src="" style="display:none; width:100%; max-height:300px; object-fit:contain;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <button type="button" id="btn-start-camera" class="btn btn-secondary btn-block">
+                            <i class="fa-solid fa-video"></i> Open Live Camera
+                        </button>
+                        <button type="button" id="btn-capture-photo" class="btn btn-primary btn-block hidden">
+                            <i class="fa-solid fa-camera"></i> Capture Photo
+                        </button>
+                        <div style="display:flex; gap:0.75rem;">
+                            <label for="proof-file-input" class="btn btn-secondary" style="flex:1; text-align:center; cursor:pointer;">
+                                <i class="fa-solid fa-upload"></i> Upload from Gallery
+                                <input type="file" id="proof-file-input" accept="image/*" style="display:none;">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="submit-proof-submit" disabled>
+                        <i class="fa-solid fa-check-circle"></i> Confirm Delivery
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Order Timeline + Live Map Modal -->
+    <div id="order-timeline-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:660px;">
+            <div class="modal-header">
+                <h3 id="timeline-order-title"><i class="fa-solid fa-route"></i> Order Tracking</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="timeline-container" style="padding: 0.75rem 0;"></div>
+            <!-- Live Map (shown only when out_for_delivery) -->
+            <div id="live-map-section" style="display:none; margin-top:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <h4 style="margin:0;"><span style="width:8px; height:8px; background:#ef4444; border-radius:50%; display:inline-block; margin-right:6px; animation: pulse 1.5s infinite;"></span>Live Location</h4>
+                    <span id="live-map-timestamp" style="font-size:0.75rem; color:var(--text-muted);"></span>
+                </div>
+                <div id="timeline-map" style="height:280px; border-radius:12px; overflow:hidden; border:1px solid var(--border);"></div>
+                <div id="live-driver-info" style="margin-top:0.75rem; padding:0.75rem; background:rgba(79,70,229,0.08); border-radius:8px; font-size:0.85rem;"></div>
+                <div style="margin-top:0.75rem;">
+                    <a id="link-admin-google-maps" href="#" target="_blank" class="btn btn-secondary btn-block" style="background:#fff; border:1px solid #e2e8f0; display:none; text-decoration:none; font-size:0.8rem;">
+                        <img src="https://www.google.com/images/branding/product/ico/maps15_24dp.ico" style="width:14px;"> View on Google Maps
+                    </a>
+                </div>
+            </div>
+            <!-- Proof image -->
+            <div id="timeline-proof-container" style="margin-top:1rem;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api/base.js"></script>
+    <script src="js/api/auth.js"></script>
+    <script src="js/api/customers.js"></script>
+    <script src="js/api/products.js"></script>
+    <script src="js/api/orders.js"></script>
+    <script src="js/api/users.js"></script>
+    <script src="js/api/analytics.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

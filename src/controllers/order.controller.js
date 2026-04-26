@@ -1,171 +1,106 @@
-const Order = require("../models/order.model");
-const Product = require("../models/product.model");
+const orderService = require("../services/order.service");
+const { sendSuccess, sendError } = require("../utils/responseHandler");
+const AppError = require("../utils/AppError");
 
 const createOrder = async (req, res) => {
     try {
         const { customer, products } = req.body;
-
-        let totalAmount = 0;
-
-        // calculate total price
-        for (let item of products) {
-            const product = await Product.findById(item.product);
-            if (!product) {
-                return res.status(404).json({ message: "Product not found" });
-            }
-            totalAmount += product.price * item.quantity;
+        
+        // Lightweight controller validation
+        if (!customer || !products || products.length === 0) {
+            throw new AppError("Customer and at least one product are required", 400);
         }
 
-        const order = await Order.create({
-            customer,
-            products,
-            totalAmount,
-            createdBy: req.user.id, // from token
-        });
-
-        res.status(201).json({
-            message: "Order created successfully",
-            order,
-        });
+        const io = req.app.get("io");
+        const order = await orderService.createOrder(req.user.id, { customer, products }, io);
+        return sendSuccess(res, 201, { order }, "Order created successfully");
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
 const getOrders = async (req, res) => {
     try {
-        const query = { isActive: true };
-
-        // if user, restrict orders
-        if (req.user.role !== "admin") {
-            query.createdBy = req.user.id;
-        }
-
-        const orders = await Order.find(query)
-            .populate("customer", "name email phone")
-            .populate("products.product", "name price")
-            .populate("createdBy", "name email")
-            .sort({ createdAt: -1 });
-
-        res.status(200).json(orders);
+        const orders = await orderService.getOrders(req.user);
+        // Returning raw array for compatibility
+        return res.status(200).json(orders);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
+const getOrderLocation = async (req, res) => {
+    try {
+        const location = await orderService.getOrderLocation(req.params.id);
+        return res.json(location);
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
 
 const updateOrderStatus = async (req, res) => {
     try {
-        const { status, payment } = req.body;
+        const { status } = req.body;
+        if (!status) throw new AppError("Status is required", 400);
 
-        const allowedStatus = ["pending", "paid", "shipped", "delivered", "cancelled"];
-        if (!allowedStatus.includes(status)) {
-            return res.status(400).json({ message: "Invalid status" });
-        }
-
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            return res.status(404).json({ message: "Order not found" });
-        }
-
-        // 🟢 Payment success → reduce stock ONCE
-        if (order.status !== "paid" && status === "paid") {
-            for (const item of order.products) {
-                await Product.findByIdAndUpdate(
-                    item.product,
-                    { $inc: { stock: -item.quantity } }
-                );
-            }
-
-            order.payment = {
-                method: payment?.method,
-                transactionId: payment?.transactionId,
-                paidAt: new Date()
-            };
-        }
-
-        // 🔴 Cancel paid order → restore stock
-        if (order.status === "paid" && status === "cancelled") {
-            for (const item of order.products) {
-                await Product.findByIdAndUpdate(
-                    item.product,
-                    { $inc: { stock: item.quantity } }
-                );
-            }
-        }
-
-        order.status = status;
-        await order.save();
-
-        res.json({ message: "Order status updated", order });
-
+        const io = req.app.get("io");
+        const result = await orderService.updateOrderStatus(req.params.id, status, io);
+        return res.json({ message: "Order status updated", status: result.status });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
-const getSalesSummary = async (req, res) => {
+const assignDriver = async (req, res) => {
     try {
-        const totalOrders = await Order.countDocuments({ isActive: true });
+        const { driver_id, driver_name, vehicle_number } = req.body;
+        if (!driver_id && !driver_name) {
+            throw new AppError("Missing driver details", 400);
+        }
 
-        const revenue = await Order.aggregate([
-            { $match: { status: "paid", isActive: true } },
-            {
-                $group: {
-                    _id: null,
-                    totalRevenue: { $sum: "$totalAmount" }
-                }
-            }
-        ]);
-
-        const statusWise = await Order.aggregate([
-            { $match: { isActive: true } },
-            {
-                $group: {
-                    _id: "$status",
-                    count: { $sum: 1 }
-                }
-            }
-        ]);
-
-        res.json({
-            totalOrders,
-            totalRevenue: revenue[0]?.totalRevenue || 0,
-            statusWise
-        });
+        const io = req.app.get("io");
+        await orderService.assignDriver(req.params.id, { driver_id, driver_name, vehicle_number }, io);
+        return res.json({ message: "Driver assigned and order is out for delivery" });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
-
-const getMonthlySales = async (req, res) => {
+const updateLocation = async (req, res) => {
     try {
-        const sales = await Order.aggregate([
-            {
-                $match: {
-                    status: "paid",
-                    isActive: true
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        year: { $year: "$createdAt" },
-                        month: { $month: "$createdAt" }
-                    },
-                    totalSales: { $sum: "$totalAmount" },
-                    orders: { $sum: 1 }
-                }
-            },
-            { $sort: { "_id.year": 1, "_id.month": 1 } }
-        ]);
+        const { delivery_location, lat, lng, address } = req.body;
+        if (!delivery_location && (!lat || !lng)) {
+            throw new AppError("Missing location coordinates", 400);
+        }
 
-        res.json(sales);
+        const result = await orderService.updateLocation(req.params.id, { delivery_location, lat, lng, address });
+        return res.json({ message: "Location updated", location: result.location, address: result.address });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
+const submitProof = async (req, res) => {
+    try {
+        const proof_image = req.file ? `/uploads/proofs/${req.file.filename}` : req.body.proof_image;
+        if (!proof_image) {
+            throw new AppError("No proof image provided", 400);
+        }
 
-module.exports = { createOrder, getOrders, updateOrderStatus, getSalesSummary, getMonthlySales };
+        const io = req.app.get("io");
+        await orderService.submitProof(req.params.id, proof_image, io);
+        return res.json({ message: "Delivery confirmed and customer notified" });
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
+module.exports = { 
+    createOrder, 
+    getOrders, 
+    getOrderLocation, 
+    updateOrderStatus, 
+    assignDriver, 
+    updateLocation, 
+    submitProof 
+};

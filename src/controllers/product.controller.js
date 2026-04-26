@@ -1,109 +1,43 @@
-const Product = require("../models/product.model");
+const productService = require("../services/product.service");
+const { sendSuccess, sendError } = require("../utils/responseHandler");
+const AppError = require("../utils/AppError");
 
-// CREATE PRODUCT
 const createProduct = async (req, res) => {
     try {
         const { name, price, description } = req.body;
 
-        const existingProduct = await Product.findOne({ name });
-        if (existingProduct) {
-            return res.status(400).json({ message: "Product already exists" });
+        // Lightweight controller validation
+        if (!name || price === undefined) {
+            throw new AppError("Name and price are required", 400);
         }
 
-        const product = await Product.create({
-            name,
-            price,
-            description,
-        });
-
-        res.status(201).json({
-            message: "Product created successfully",
-            product,
-        });
+        const product = await productService.createProduct({ name, price, description });
+        return sendSuccess(res, 201, { product }, "Product created successfully");
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
-// GET PRODUCTS (pagination + search + active only)
 const getProducts = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
-        const search = req.query.search || "";
-
-        const query = {
-            isActive: true,
-            name: { $regex: search, $options: "i" }
-        };
-
-        const products = await Product.find(query)
-            .skip(skip)
-            .limit(limit)
-            .sort({ createdAt: -1 });
-
-        const total = await Product.countDocuments(query);
-
-        res.status(200).json({ page, limit, total, products });
+        const search = req.query.search || '';
+        const products = await productService.getAllProducts(search);
+        return sendSuccess(res, 200, { products });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
-
-const updateProduct = async (req, res) => {
-    try {
-        const product = await Product.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
-        );
-
-        if (!product) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-
-        res.json({ message: "Product updated", product });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
 
 const deleteProduct = async (req, res) => {
     try {
-        const product = await Product.findByIdAndUpdate(
-            req.params.id,
-            { isActive: false },
-            { new: true }
-        );
-
-        res.json({ message: "Product deleted", product });
+        await productService.deleteProduct(req.params.id);
+        return sendSuccess(res, 200, null, "Product deleted successfully");
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return sendError(res, error);
     }
 };
 
-const restoreProduct = async (req, res) => {
-    try {
-        const product = await Product.findByIdAndUpdate(
-            req.params.id,
-            { isActive: true },
-            { new: true }
-        );
+const updateProduct = async (req, res) => res.status(501).json({ message: "Not implemented" });
+const restoreProduct = async (req, res) => res.status(501).json({ message: "Not implemented" });
 
-        res.json({ message: "Product restored", product });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-
-
-module.exports = {
-    createProduct,
-    getProducts,
-    updateProduct,
-    deleteProduct,
-    restoreProduct
-};
+module.exports = { createProduct, getProducts, deleteProduct, updateProduct, restoreProduct };
