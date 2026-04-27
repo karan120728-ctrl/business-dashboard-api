@@ -87,18 +87,9 @@ app.get("/api/seed", async (req, res) => {
     // 3. Update existing table columns and roles
     await pool.query("ALTER TABLE users MODIFY role ENUM('superadmin', 'admin', 'driver', 'customer') DEFAULT 'customer'");
     
-    // Add Security Columns to users if missing
-    const securityCols = [
-      "reset_token_hash VARCHAR(255) NULL",
-      "reset_expires TIMESTAMP NULL"
-    ];
-    for (const col of securityCols) {
-      const colName = col.split(" ")[0];
-      const [exists] = await pool.query(`SHOW COLUMNS FROM users LIKE ?`, [colName]);
-      if (exists.length === 0) {
-        await pool.query(`ALTER TABLE users ADD COLUMN ${col}`);
-      }
-    }
+    // Add Security Columns to users (Direct Force)
+    try { await pool.query("ALTER TABLE users ADD COLUMN reset_token_hash VARCHAR(255) NULL"); } catch(e){ console.log("reset_token_hash already exists or failed:", e.message); }
+    try { await pool.query("ALTER TABLE users ADD COLUMN reset_expires TIMESTAMP NULL"); } catch(e){ console.log("reset_expires already exists or failed:", e.message); }
 
     await pool.query("ALTER TABLE orders MODIFY status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending'");
     
