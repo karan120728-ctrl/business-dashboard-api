@@ -51,12 +51,22 @@ const initDB = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         customer_id INT NOT NULL,
         total_amount DECIMAL(10, 2) NOT NULL,
-        status ENUM('pending', 'paid', 'shipped', 'completed', 'cancelled') DEFAULT 'pending',
+        status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending',
+        driver_id INT NULL,
+        driver_name VARCHAR(255),
+        vehicle_number VARCHAR(100),
+        delivery_location VARCHAR(255),
+        current_address TEXT,
+        proof_image_url VARCHAR(255),
+        packed_at TIMESTAMP NULL,
+        out_for_delivery_at TIMESTAMP NULL,
+        delivered_at TIMESTAMP NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_by INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (customer_id) REFERENCES customers(id),
+        FOREIGN KEY (driver_id) REFERENCES users(id),
         FOREIGN KEY (created_by) REFERENCES users(id)
       )
     `);

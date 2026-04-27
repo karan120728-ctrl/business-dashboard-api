@@ -62,13 +62,34 @@ app.post("/api/seed", async (req, res) => {
     const { pool } = require("./db/connection");
     const bcrypt = require("bcrypt");
     
-    // FIX LIVE SCHEMA: Update roles and add driver_id
+    // FIX LIVE SCHEMA: Update roles and add all logistics columns
     await pool.query("ALTER TABLE users MODIFY role ENUM('superadmin', 'admin', 'driver', 'customer') DEFAULT 'customer'");
-    const [cols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'driver_id'");
-    if (cols.length === 0) {
-      await pool.query("ALTER TABLE orders ADD COLUMN driver_id INT NULL");
-      await pool.query("ALTER TABLE orders ADD CONSTRAINT fk_order_driver FOREIGN KEY (driver_id) REFERENCES users(id)");
+    
+    // Update Orders Table Status and add missing columns
+    await pool.query("ALTER TABLE orders MODIFY status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending'");
+    
+    const columnsToAdd = [
+      "driver_id INT NULL",
+      "driver_name VARCHAR(255)",
+      "vehicle_number VARCHAR(100)",
+      "delivery_location VARCHAR(255)",
+      "current_address TEXT",
+      "proof_image_url VARCHAR(255)",
+      "packed_at TIMESTAMP NULL",
+      "out_for_delivery_at TIMESTAMP NULL",
+      "delivered_at TIMESTAMP NULL"
+    ];
+
+    for (const col of columnsToAdd) {
+      const colName = col.split(" ")[0];
+      const [exists] = await pool.query(`SHOW COLUMNS FROM orders LIKE ?`, [colName]);
+      if (exists.length === 0) {
+        await pool.query(`ALTER TABLE orders ADD COLUMN ${col}`);
+      }
     }
+
+    // Ensure foreign key for driver_id exists
+    try { await pool.query("ALTER TABLE orders ADD CONSTRAINT fk_order_driver FOREIGN KEY (driver_id) REFERENCES users(id)"); } catch(e){}
 
     const adminHash = await bcrypt.hash("admin123", 10);
     const demoHash = await bcrypt.hash("password", 10);
