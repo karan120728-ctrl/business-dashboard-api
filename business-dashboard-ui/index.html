@@ -187,6 +187,13 @@
                 <i class="fa-solid fa-layer-group logo-icon"></i>
                 <h2>FlowOps</h2>
             </div>
+            <div id="invite-code-container" class="invite-code-box hidden" style="margin: 0 1rem 1rem 1rem; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <p style="font-size: 0.7rem; color: var(--sidebar-text); margin-bottom: 0.25rem;">BUSINESS INVITE CODE</p>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <code id="display-invite-code" style="color: var(--primary); font-weight: bold; font-family: monospace;">------</code>
+                    <button onclick="copyInviteCode()" class="icon-btn" style="color: var(--sidebar-text); padding: 0; font-size: 0.8rem;"><i class="fa-solid fa-copy"></i></button>
+                </div>
+            </div>
             <p class="sidebar-tagline">Manage everything in one place.</p>
             <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-view="dashboard" id="dashboard-link"><i class="fa-solid fa-chart-line"></i> Dashboard</a>

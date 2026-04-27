@@ -73,7 +73,13 @@ const createUser = async (userData) => {
 };
 
 const loginUser = async (email, password) => {
-    const [users] = await pool.query("SELECT * FROM users WHERE email = ?", [email.trim().toLowerCase()]);
+    const [users] = await pool.query(`
+        SELECT u.*, b.business_code 
+        FROM users u 
+        LEFT JOIN businesses b ON u.business_id = b.id 
+        WHERE u.email = ?
+    `, [email.trim().toLowerCase()]);
+    
     const user = users[0];
     
     if (!user) throw new AppError("Invalid credentials", 401);
@@ -89,7 +95,14 @@ const loginUser = async (email, password) => {
 
     return {
         token,
-        user: { id: user.id, name: user.name, email: user.email, role: user.role, business_id: user.business_id }
+        user: { 
+            id: user.id, 
+            name: user.name, 
+            email: user.email, 
+            role: user.role, 
+            business_id: user.business_id,
+            business_code: user.business_code 
+        }
     };
 };
 

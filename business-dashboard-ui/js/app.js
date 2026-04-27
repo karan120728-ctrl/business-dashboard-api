@@ -72,7 +72,27 @@ function setupUI() {
         roleEl.innerText = (role || 'User').toUpperCase();
         roleEl.className = `badge ${role === 'superadmin' || role === 'admin' ? 'badge-warning' : 'badge-neutral'}`;
     }
+
+    // Show Invite Code for Admins
+    const inviteContainer = document.getElementById('invite-code-container');
+    const displayCode = document.getElementById('display-invite-code');
+    if (inviteContainer && (role === 'admin' || role === 'superadmin')) {
+        inviteContainer.classList.remove('hidden');
+        if (displayCode) displayCode.innerText = currentUser.business_code || '------';
+    } else if (inviteContainer) {
+        inviteContainer.classList.add('hidden');
+    }
 }
+
+// Global function for copying invite code
+window.copyInviteCode = () => {
+    const code = document.getElementById('display-invite-code').innerText;
+    if (code && code !== '------') {
+        navigator.clipboard.writeText(code).then(() => {
+            showToast('Invite Code copied to clipboard!', 'success');
+        });
+    }
+};
 
 function initApp() {
     try {
