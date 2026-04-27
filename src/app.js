@@ -47,9 +47,31 @@ io.on("connection", (socket) => {
 // Export IO to use in controllers
 app.set("io", io);
 
-// test route
+// Health check
 app.get("/", (req, res) => {
-  res.send("Business Dashboard API with Real-time Notifications is running");
+  res.send("FlowOps API is running ✅");
+});
+
+// One-click production seed endpoint
+app.post("/api/seed", async (req, res) => {
+  const { secret } = req.body;
+  if (secret !== (process.env.SEED_SECRET || "flowops_seed_2026")) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  try {
+    const { pool } = require("./db/connection");
+    const bcrypt = require("bcrypt");
+    const adminHash = await bcrypt.hash("admin123", 10);
+    const demoHash = await bcrypt.hash("password", 10);
+    await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Admin User','admin@flowops.com',?,'admin')`, [adminHash]);
+    await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Demo Driver','driver@flowops.com',?,'driver')`, [demoHash]);
+    await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Demo Customer','customer@flowops.com',?,'customer')`, [demoHash]);
+    await pool.query(`INSERT IGNORE INTO customers (name, email, phone) VALUES ('Acme Corp','contact@acme.com','555-0101'),('Globex','info@globex.com','555-0102'),('Soylent Corp','hello@soylent.com','555-0103')`);
+    await pool.query(`INSERT IGNORE INTO products (name, price, description) VALUES ('SaaS Starter Plan',49.99,'Basic monthly subscription'),('SaaS Pro Plan',99.99,'Advanced monthly subscription'),('Enterprise License',999.00,'Yearly enterprise access')`);
+    res.json({ message: "✅ Seeded! Logins — admin@flowops.com/admin123 | driver@flowops.com/password | customer@flowops.com/password" });
+  } catch (e) {
+    res.status(500).json({ message: "Seed failed: " + e.message });
+  }
 });
 
 // Routes

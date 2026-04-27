@@ -7,8 +7,10 @@ const seedDB = async () => {
 
         console.log("Seeding database with demo data...");
 
-        // 1. Seed Users
+        // 1. Seed Users (Admin, Driver, Customer demo accounts)
         const adminHash = await bcrypt.hash('admin123', 10);
+        const demoHash = await bcrypt.hash('password', 10);
+
         const [adminResult] = await connection.query(`
             INSERT IGNORE INTO users (name, email, password, role) 
             VALUES ('Admin User', 'admin@flowops.com', ?, 'admin')
@@ -19,6 +21,19 @@ const seedDB = async () => {
              const [rows] = await connection.query("SELECT id FROM users WHERE email = 'admin@flowops.com'");
              adminId = rows[0].id;
         }
+
+        // Seed demo Driver account
+        await connection.query(`
+            INSERT IGNORE INTO users (name, email, password, role) 
+            VALUES ('Demo Driver', 'driver@flowops.com', ?, 'driver')
+        `, [demoHash]);
+
+        // Seed demo Customer account
+        await connection.query(`
+            INSERT IGNORE INTO users (name, email, password, role) 
+            VALUES ('Demo Customer', 'customer@flowops.com', ?, 'customer')
+        `, [demoHash]);
+
 
         // 2. Seed Customers
         await connection.query(`

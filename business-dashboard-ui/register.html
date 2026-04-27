@@ -41,9 +41,8 @@
         </div>
 
         <div class="role-toggle">
-            <div class="role-btn active" data-role="customer" onclick="setRole('customer')">Customer</div>
-            <div class="role-btn" data-role="driver" onclick="setRole('driver')">Driver</div>
-            <div class="role-btn" data-role="admin" onclick="setRole('admin')">Admin</div>
+            <div class="role-btn active" data-role="customer" onclick="setRole('customer')">👤 Customer</div>
+            <div class="role-btn" data-role="driver" onclick="setRole('driver')">🚛 Driver</div>
         </div>
 
         <form id="register-form">
@@ -80,17 +79,20 @@
 
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const role = document.getElementById('role').value;
             const btn = document.getElementById('btn-register-submit');
 
+            if (!name || !email || !password) {
+                return showToast('Please fill in all fields', 'error');
+            }
+
             btn.disabled = true;
-            btn.innerHTML = 'Creating account...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account...';
 
             try {
-                // The API endpoint in user.route.js is /createUser
                 const response = await fetch(`${window.API_URL}/users/createUser`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -99,16 +101,14 @@
                 
                 const data = await response.json();
                 
-                if (response.ok) {
-                    showToast('Account created successfully! Please log in.', 'success');
-                    setTimeout(() => {
-                        window.location.href = 'login.html';
-                    }, 1500);
+                if (response.ok || response.status === 201) {
+                    showToast('Account created! Redirecting to login...', 'success');
+                    setTimeout(() => { window.location.href = 'login.html'; }, 1500);
                 } else {
-                    showToast(data.message || 'Registration failed', 'error');
+                    showToast(data.message || 'Registration failed. Please try again.', 'error');
                 }
             } catch (err) {
-                showToast('Network error. Is the server running?', 'error');
+                showToast('Cannot connect to server. Please try again later.', 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Create Account';
