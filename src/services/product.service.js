@@ -1,17 +1,17 @@
 const { pool } = require("../db/connection");
 const AppError = require("../utils/AppError");
 
-const createProduct = async (data) => {
+const createProduct = async (businessId, data) => {
     const { name, price, description } = data;
 
-    const [existing] = await pool.query("SELECT id FROM products WHERE name = ?", [name]);
+    const [existing] = await pool.query("SELECT id FROM products WHERE name = ? AND business_id = ?", [name, businessId]);
     if (existing.length > 0) {
-        throw new AppError("Product already exists", 400);
+        throw new AppError("Product already exists in your business", 400);
     }
 
     const [result] = await pool.query(
-        "INSERT INTO products (name, price, description) VALUES (?, ?, ?)",
-        [name, price, description || null]
+        "INSERT INTO products (business_id, name, price, description) VALUES (?, ?, ?, ?)",
+        [businessId, name, price, description || null]
     );
 
     return {
@@ -23,9 +23,9 @@ const createProduct = async (data) => {
     };
 };
 
-const getAllProducts = async (searchQuery) => {
-    let query = "SELECT * FROM products WHERE is_active = TRUE";
-    let params = [];
+const getAllProducts = async (businessId, searchQuery) => {
+    let query = "SELECT * FROM products WHERE is_active = TRUE AND business_id = ?";
+    let params = [businessId];
     
     if (searchQuery) {
         query += " AND name LIKE ?";
@@ -38,8 +38,8 @@ const getAllProducts = async (searchQuery) => {
     return products;
 };
 
-const deleteProduct = async (id) => {
-    const [result] = await pool.query("UPDATE products SET is_active = FALSE WHERE id = ?", [id]);
+const deleteProduct = async (id, businessId) => {
+    const [result] = await pool.query("UPDATE products SET is_active = FALSE WHERE id = ? AND business_id = ?", [id, businessId]);
     if (result.affectedRows === 0) {
         throw new AppError("Product not found", 404);
     }

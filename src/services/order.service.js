@@ -3,7 +3,7 @@ const AppError = require("../utils/AppError");
 const { ORDER_STATUS } = require("../utils/constants");
 const notificationService = require("./notification.service");
 
-const createOrder = async (userId, data, io) => {
+const createOrder = async (userId, businessId, data, io) => {
     const { customer, products } = data;
 
     const connection = await pool.getConnection();
@@ -12,16 +12,19 @@ const createOrder = async (userId, data, io) => {
         
         let totalAmount = 0;
         for (let item of products) {
-            const [productRows] = await connection.query("SELECT price FROM products WHERE id = ?", [item.product]);
+            const [productRows] = await connection.query(
+                "SELECT price FROM products WHERE id = ? AND business_id = ?", 
+                [item.product, businessId]
+            );
             if (productRows.length === 0) {
-                throw new AppError("Product not found", 404);
+                throw new AppError("Product not found in your business", 404);
             }
             totalAmount += productRows[0].price * item.quantity;
         }
 
         const [orderResult] = await connection.query(
-            "INSERT INTO orders (customer_id, total_amount, created_by) VALUES (?, ?, ?)",
-            [customer, totalAmount, userId]
+            "INSERT INTO orders (business_id, customer_id, total_amount, created_by) VALUES (?, ?, ?, ?)",
+            [businessId, customer, totalAmount, userId]
         );
         const orderId = orderResult.insertId;
 
@@ -44,6 +47,7 @@ const createOrder = async (userId, data, io) => {
 };
 
 const getOrders = async (user) => {
+    const businessId = user.business_id;
     let queryStr = `
         SELECT o.*,
                c.name as customer_name, c.email as customer_email, c.phone as customer_phone, c.address as customer_address,
@@ -51,9 +55,9 @@ const getOrders = async (user) => {
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         JOIN users u ON o.created_by = u.id
-        WHERE o.is_active = TRUE
+        WHERE o.is_active = TRUE AND o.business_id = ?
     `;
-    const params = [];
+    const params = [businessId];
     
     if (user.role === "driver") {
         queryStr += " AND o.driver_id = ?";
@@ -72,16 +76,16 @@ const getOrders = async (user) => {
     return orders;
 };
 
-const getOrderLocation = async (orderId) => {
+const getOrderLocation = async (orderId, businessId) => {
     const [rows] = await pool.query(
-        "SELECT id, status, delivery_location, current_address, driver_name, vehicle_number FROM orders WHERE id = ? AND is_active = TRUE",
-        [orderId]
+        "SELECT id, status, delivery_location, current_address, driver_name, vehicle_number FROM orders WHERE id = ? AND business_id = ? AND is_active = TRUE",
+        [orderId, businessId]
     );
     if (rows.length === 0) throw new AppError("Order not found", 404);
     return rows[0];
 };
 
-const updateOrderStatus = async (orderId, status, io) => {
+const updateOrderStatus = async (orderId, businessId, status, io) => {
     const allowedStatus = Object.values(ORDER_STATUS);
     if (!allowedStatus.includes(status)) throw new AppError("Invalid status", 400);
 
@@ -92,8 +96,8 @@ const updateOrderStatus = async (orderId, status, io) => {
     else if (status === ORDER_STATUS.OUT_FOR_DELIVERY) { query += ", out_for_delivery_at = CURRENT_TIMESTAMP"; }
     else if (status === ORDER_STATUS.DELIVERED) { query += ", delivered_at = CURRENT_TIMESTAMP"; }
     
-    query += " WHERE id = ?";
-    params.push(orderId);
+    query += " WHERE id = ? AND business_id = ?";
+    params.push(orderId, businessId);
 
     const [result] = await pool.query(query, params);
     if (result.affectedRows === 0) throw new AppError("Order not found", 404);
@@ -102,57 +106,57 @@ const updateOrderStatus = async (orderId, status, io) => {
     const [orderRows] = await pool.query("SELECT o.*, c.email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?", [orderId]);
     if (orderRows.length > 0) {
         const order = orderRows[0];
-        const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer'", [order.email]);
+        const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
         if (customerUserRows.length > 0) {
-            notificationService.createNotification(io, customerUserRows[0].id, "Order Update", `Your order #${order.id} is now ${status.replace(/_/g, ' ')}!`);
+            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Order Update", `Your order #${order.id} is now ${status.replace(/_/g, ' ')}!`);
         }
     }
 
     return { status };
 };
 
-const assignDriver = async (orderId, data, io) => {
+const assignDriver = async (orderId, businessId, data, io) => {
     const { driver_id, driver_name, vehicle_number } = data;
 
     const [result] = await pool.query(
-        "UPDATE orders SET driver_id = ?, driver_name = ?, vehicle_number = ?, status = 'out_for_delivery', out_for_delivery_at = CURRENT_TIMESTAMP WHERE id = ?",
-        [driver_id || null, driver_name, vehicle_number, orderId]
+        "UPDATE orders SET driver_id = ?, driver_name = ?, vehicle_number = ?, status = 'out_for_delivery', out_for_delivery_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?",
+        [driver_id || null, driver_name, vehicle_number, orderId, businessId]
     );
     if (result.affectedRows === 0) throw new AppError("Order not found", 404);
 
     if (driver_id) {
-        notificationService.createNotification(io, driver_id, "New Delivery Assigned 🚛", `You have been assigned order #${orderId}. Tap to start tracking!`);
+        notificationService.createNotification(io, businessId, driver_id, "New Delivery Assigned 🚛", `You have been assigned order #${orderId}. Tap to start tracking!`);
     }
 
     return true;
 };
 
-const updateLocation = async (orderId, data) => {
+const updateLocation = async (orderId, businessId, data) => {
     const { delivery_location, lat, lng, address } = data;
     const locationStr = (lat && lng) ? `${lat},${lng}` : delivery_location;
     
     const [result] = await pool.query(
-        "UPDATE orders SET delivery_location = ?, current_address = ? WHERE id = ?",
-        [locationStr, address || null, orderId]
+        "UPDATE orders SET delivery_location = ?, current_address = ? WHERE id = ? AND business_id = ?",
+        [locationStr, address || null, orderId, businessId]
     );
     if (result.affectedRows === 0) throw new AppError("Order not found", 404);
     
     return { location: locationStr, address };
 };
 
-const submitProof = async (orderId, proofImage, io) => {
+const submitProof = async (orderId, businessId, proofImage, io) => {
     const [result] = await pool.query(
-        "UPDATE orders SET proof_image_url = ?, status = 'delivered', delivered_at = CURRENT_TIMESTAMP WHERE id = ?",
-        [proofImage, orderId]
+        "UPDATE orders SET proof_image_url = ?, status = 'delivered', delivered_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?",
+        [proofImage, orderId, businessId]
     );
     if (result.affectedRows === 0) throw new AppError("Order not found", 404);
 
     const [orderRows] = await pool.query("SELECT o.*, c.email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?", [orderId]);
     if (orderRows.length > 0) {
         const order = orderRows[0];
-        const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer'", [order.email]);
+        const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
         if (customerUserRows.length > 0) {
-            notificationService.createNotification(io, customerUserRows[0].id, "Package Delivered! ✅", `Order #${order.id} has been successfully delivered. Thank you!`);
+            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Package Delivered! ✅", `Order #${order.id} has been successfully delivered. Thank you!`);
         }
     }
 

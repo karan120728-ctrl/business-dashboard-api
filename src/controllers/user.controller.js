@@ -53,4 +53,31 @@ const updateUser = async (req, res) => {
     }
 };
 
-module.exports = { createUser, getUser, loginUser, updateUser };
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) throw new AppError("Email is required", 400);
+
+        const token = await userService.forgotPassword(email);
+        
+        // In Dev Mode, we return the token in the response.
+        // In Production, this would be sent via email.
+        return sendSuccess(res, 200, { resetToken: token }, "Reset token generated successfully (Dev Mode)");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        if (!token || !newPassword) throw new AppError("Token and new password are required", 400);
+
+        await userService.resetPassword(token, newPassword);
+        return sendSuccess(res, 200, null, "Password reset successfully");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
+module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword };

@@ -91,13 +91,31 @@ app.post("/api/seed", async (req, res) => {
     // Ensure foreign key for driver_id exists
     try { await pool.query("ALTER TABLE orders ADD CONSTRAINT fk_order_driver FOREIGN KEY (driver_id) REFERENCES users(id)"); } catch(e){}
 
+    // Ensure a default business exists for migration
+    const [busRows] = await pool.query("SELECT id FROM businesses LIMIT 1");
+    let defaultBusId = 1;
+    if (busRows.length === 0) {
+      const [res] = await pool.query("INSERT INTO businesses (name, business_code) VALUES ('FlowOps Global', 'FLOW-000000')");
+      defaultBusId = res.insertId;
+    } else {
+      defaultBusId = busRows[0].id;
+    }
+
+    // Migrate existing records to the default business
+    const tablesToMigrate = ['users', 'customers', 'products', 'orders', 'notifications'];
+    for (const table of tablesToMigrate) {
+      await pool.query(`UPDATE ${table} SET business_id = ? WHERE business_id IS NULL`, [defaultBusId]);
+    }
+
     const adminHash = await bcrypt.hash("admin123", 10);
     const demoHash = await bcrypt.hash("password", 10);
-    await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Admin User','admin@flowops.com',?,'admin')`, [adminHash]);
-    await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Demo Driver','driver@flowops.com',?,'driver')`, [demoHash]);
-    await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Demo Customer','customer@flowops.com',?,'customer')`, [demoHash]);
-    await pool.query(`INSERT IGNORE INTO customers (name, email, phone) VALUES ('Acme Corp','contact@acme.com','555-0101'),('Globex','info@globex.com','555-0102'),('Soylent Corp','hello@soylent.com','555-0103')`);
-    await pool.query(`INSERT IGNORE INTO products (name, price, description) VALUES ('SaaS Starter Plan',49.99,'Basic monthly subscription'),('SaaS Pro Plan',99.99,'Advanced monthly subscription'),('Enterprise License',999.00,'Yearly enterprise access')`);
+    
+    // Insert admin with default business_id
+    await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Admin User','admin@flowops.com',?,'admin')`, [defaultBusId, adminHash]);
+    await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Demo Driver','driver@flowops.com',?,'driver')`, [defaultBusId, demoHash]);
+    await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Demo Customer','customer@flowops.com',?,'customer')`, [defaultBusId, demoHash]);
+    await pool.query(`INSERT IGNORE INTO customers (business_id, name, email, phone) VALUES (?, 'Acme Corp','contact@acme.com','555-0101'),(?, 'Globex','info@globex.com','555-0102'),(?, 'Soylent Corp','hello@soylent.com','555-0103')`, [defaultBusId, defaultBusId, defaultBusId]);
+    await pool.query(`INSERT IGNORE INTO products (business_id, name, price, description) VALUES (?, 'SaaS Starter Plan',49.99,'Basic monthly subscription'),(?, 'SaaS Pro Plan',99.99,'Advanced monthly subscription'),(?, 'Enterprise License',999.00,'Yearly enterprise access')`, [defaultBusId, defaultBusId, defaultBusId]);
     res.json({ message: "✅ Seeded and Schema Updated! Logins — admin@flowops.com/admin123 | driver@flowops.com/password | customer@flowops.com/password" });
   } catch (e) {
     res.status(500).json({ message: "Seed failed: " + e.message });

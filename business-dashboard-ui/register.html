@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register | FlowOps</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .role-toggle {
             display: flex;
@@ -59,13 +60,17 @@
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" class="input" required placeholder="••••••••" minlength="6">
+                <div class="password-field">
+                    <input type="password" id="password" class="input" required placeholder="••••••••" minlength="6">
+                    <i class="fas fa-eye password-toggle" id="toggle-password"></i>
+                </div>
             </div>
             
-            <div class="form-group" id="admin-code-group" style="display: none;">
-                <label for="admin-code">Secret Admin Code</label>
-                <input type="password" id="admin-code" class="input" placeholder="Enter security code">
-                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Authorized staff only.</p>
+            <!-- Dynamic Business Field -->
+            <div class="form-group" id="business-group">
+                <label for="business-input" id="business-label">Business Invite Code</label>
+                <input type="text" id="business-input" class="input" required placeholder="e.g. FLOW-XXXXXX">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;" id="business-hint">Ask your manager for the company code.</p>
             </div>
 
             <button type="submit" class="btn btn-primary btn-block" id="btn-register-submit">Create Account</button>
@@ -79,19 +84,31 @@
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script>
+        // Password Visibility Toggle
+        document.getElementById('toggle-password').addEventListener('click', function() {
+            const passInput = document.getElementById('password');
+            const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye-slash');
+        });
+
         function setRole(role) {
             document.getElementById('role').value = role;
             document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector(`.role-btn[data-role="${role}"]`).classList.add('active');
             
-            // Show/hide admin code
-            const adminGroup = document.getElementById('admin-code-group');
+            const label = document.getElementById('business-label');
+            const input = document.getElementById('business-input');
+            const hint = document.getElementById('business-hint');
+
             if (role === 'admin') {
-                adminGroup.style.display = 'block';
-                document.getElementById('admin-code').required = true;
+                label.innerText = 'Company / Business Name';
+                input.placeholder = 'e.g. Acme Logistics';
+                hint.innerText = 'This will create a new private workspace for your business.';
             } else {
-                adminGroup.style.display = 'none';
-                document.getElementById('admin-code').required = false;
+                label.innerText = 'Business Invite Code';
+                input.placeholder = 'e.g. FLOW-XXXXXX';
+                hint.innerText = 'Ask your manager for the company code.';
             }
         }
 
@@ -101,35 +118,37 @@
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const role = document.getElementById('role').value;
+            const businessVal = document.getElementById('business-input').value.trim();
             const btn = document.getElementById('btn-register-submit');
 
-            if (!name || !email || !password) {
+            if (!name || !email || !password || !businessVal) {
                 return showToast('Please fill in all fields', 'error');
-            }
-
-            // Secret Code Validation for Admin
-            if (role === 'admin') {
-                const code = document.getElementById('admin-code').value;
-                if (code !== 'FLOW-ADMIN-2026') {
-                    return showToast('Invalid Secret Admin Code!', 'error');
-                }
             }
 
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account...';
 
+            const payload = { 
+                name, email, password, role,
+                businessName: role === 'admin' ? businessVal : undefined,
+                businessCode: role !== 'admin' ? businessVal : undefined
+            };
+
             try {
                 const response = await fetch(`${window.API_URL}/users/createUser`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, password, role })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
                 
                 if (response.ok || response.status === 201) {
+                    if (role === 'admin' && data.data.businessCode) {
+                        alert(`🚀 Business Created!\n\nYour Invite Code is: ${data.data.businessCode}\n\nShare this code with your Drivers and Customers.`);
+                    }
                     showToast('Account created! Redirecting to login...', 'success');
-                    setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                    setTimeout(() => { window.location.href = 'login.html'; }, 2000);
                 } else {
                     showToast(data.message || 'Registration failed. Please try again.', 'error');
                 }

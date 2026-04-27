@@ -2,11 +2,11 @@ const { pool } = require("../db/connection");
 const AppError = require("../utils/AppError");
 
 // This is called by other services
-const createNotification = async (io, userId, title, message) => {
+const createNotification = async (io, businessId, userId, title, message) => {
     try {
         const [result] = await pool.query(
-            "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
-            [userId, title, message]
+            "INSERT INTO notifications (business_id, user_id, title, message) VALUES (?, ?, ?, ?)",
+            [businessId, userId, title, message]
         );
         
         const newNotif = {
@@ -23,22 +23,21 @@ const createNotification = async (io, userId, title, message) => {
         return newNotif;
     } catch (error) {
         console.error("Failed to create notification:", error);
-        // We usually don't throw here to avoid blocking the main transaction
     }
 };
 
-const getUserNotifications = async (userId) => {
+const getUserNotifications = async (userId, businessId) => {
     const [notifications] = await pool.query(
-        "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
-        [userId]
+        "SELECT * FROM notifications WHERE user_id = ? AND business_id = ? ORDER BY created_at DESC LIMIT 50",
+        [userId, businessId]
     );
     return notifications;
 };
 
-const markAllAsRead = async (userId) => {
+const markAllAsRead = async (userId, businessId) => {
     await pool.query(
-        "UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE",
-        [userId]
+        "UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND business_id = ? AND is_read = FALSE",
+        [userId, businessId]
     );
     return true;
 };
