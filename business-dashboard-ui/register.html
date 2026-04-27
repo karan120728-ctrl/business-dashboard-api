@@ -43,6 +43,7 @@
         <div class="role-toggle">
             <div class="role-btn active" data-role="customer" onclick="setRole('customer')">👤 Customer</div>
             <div class="role-btn" data-role="driver" onclick="setRole('driver')">🚛 Driver</div>
+            <div class="role-btn" data-role="admin" onclick="setRole('admin')">💼 Admin</div>
         </div>
 
         <form id="register-form">
@@ -60,6 +61,13 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" class="input" required placeholder="••••••••" minlength="6">
             </div>
+            
+            <div class="form-group" id="admin-code-group" style="display: none;">
+                <label for="admin-code">Secret Admin Code</label>
+                <input type="password" id="admin-code" class="input" placeholder="Enter security code">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Authorized staff only.</p>
+            </div>
+
             <button type="submit" class="btn btn-primary btn-block" id="btn-register-submit">Create Account</button>
         </form>
 
@@ -75,6 +83,16 @@
             document.getElementById('role').value = role;
             document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector(`.role-btn[data-role="${role}"]`).classList.add('active');
+            
+            // Show/hide admin code
+            const adminGroup = document.getElementById('admin-code-group');
+            if (role === 'admin') {
+                adminGroup.style.display = 'block';
+                document.getElementById('admin-code').required = true;
+            } else {
+                adminGroup.style.display = 'none';
+                document.getElementById('admin-code').required = false;
+            }
         }
 
         document.getElementById('register-form').addEventListener('submit', async (e) => {
@@ -87,6 +105,14 @@
 
             if (!name || !email || !password) {
                 return showToast('Please fill in all fields', 'error');
+            }
+
+            // Secret Code Validation for Admin
+            if (role === 'admin') {
+                const code = document.getElementById('admin-code').value;
+                if (code !== 'FLOW-ADMIN-2026') {
+                    return showToast('Invalid Secret Admin Code!', 'error');
+                }
             }
 
             btn.disabled = true;
