@@ -54,10 +54,10 @@ app.get("/", (req, res) => {
 });
 
 // One-click production seed endpoint
-app.post("/api/seed", async (req, res) => {
-  const { secret } = req.body;
+app.get("/api/seed", async (req, res) => {
+  const secret = req.query.secret;
   if (secret !== (process.env.SEED_SECRET || "flowops_seed_2026")) {
-    return res.status(403).json({ message: "Forbidden" });
+    return res.status(403).json({ message: "Forbidden. Provide ?secret=..." });
   }
   try {
     // 1. NUCLEAR SCHEMA FIX: Ensure Businesses table exists first
