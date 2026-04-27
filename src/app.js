@@ -1,8 +1,9 @@
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
-const { connectDB } = require("./db/connection");
+const { connectDB, pool } = require("./db/connection");
 const initDB = require("./db/init");
+const bcrypt = require("bcrypt");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -59,16 +60,36 @@ app.post("/api/seed", async (req, res) => {
     return res.status(403).json({ message: "Forbidden" });
   }
   try {
-    const { pool } = require("./db/connection");
-    const bcrypt = require("bcrypt");
-    
-    // FIX LIVE SCHEMA: Update roles and add all logistics columns
+    // 1. NUCLEAR SCHEMA FIX: Ensure Businesses table exists first
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS businesses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        business_code VARCHAR(50) NOT NULL UNIQUE,
+        owner_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 2. Add business_id column to all isolated tables
+    const tablesToIsolated = ['users', 'customers', 'products', 'orders', 'notifications'];
+    for (const table of tablesToIsolated) {
+      const [exists] = await pool.query(`SHOW COLUMNS FROM ${table} LIKE 'business_id'`);
+      if (exists.length === 0) {
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN business_id INT NULL AFTER id`);
+        // Add constraint if possible
+        try {
+          await pool.query(`ALTER TABLE ${table} ADD CONSTRAINT fk_${table}_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE`);
+        } catch(e) { console.log(`Constraint for ${table} already exists or failed:`, e.message); }
+      }
+    }
+
+    // 3. Update existing table columns and roles
     await pool.query("ALTER TABLE users MODIFY role ENUM('superadmin', 'admin', 'driver', 'customer') DEFAULT 'customer'");
-    
-    // Update Orders Table Status and add missing columns
     await pool.query("ALTER TABLE orders MODIFY status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending'");
     
-    const columnsToAdd = [
+    // 4. Add Logistics columns to orders
+    const logisticsCols = [
       "driver_id INT NULL",
       "driver_name VARCHAR(255)",
       "vehicle_number VARCHAR(100)",
@@ -80,7 +101,7 @@ app.post("/api/seed", async (req, res) => {
       "delivered_at TIMESTAMP NULL"
     ];
 
-    for (const col of columnsToAdd) {
+    for (const col of logisticsCols) {
       const colName = col.split(" ")[0];
       const [exists] = await pool.query(`SHOW COLUMNS FROM orders LIKE ?`, [colName]);
       if (exists.length === 0) {
@@ -88,10 +109,12 @@ app.post("/api/seed", async (req, res) => {
       }
     }
 
-    // Ensure foreign key for driver_id exists
-    try { await pool.query("ALTER TABLE orders ADD CONSTRAINT fk_order_driver FOREIGN KEY (driver_id) REFERENCES users(id)"); } catch(e){}
+    // 5. Ensure Unique Constraint for Customers (Multi-Tenant)
+    try {
+      await pool.query("ALTER TABLE customers ADD UNIQUE INDEX idx_business_email (business_id, email)");
+    } catch(e) {}
 
-    // Ensure a default business exists for migration
+    // 6. Ensure a default business exists for migration
     const [busRows] = await pool.query("SELECT id FROM businesses LIMIT 1");
     let defaultBusId = 1;
     if (busRows.length === 0) {
@@ -101,22 +124,22 @@ app.post("/api/seed", async (req, res) => {
       defaultBusId = busRows[0].id;
     }
 
-    // Migrate existing records to the default business
-    const tablesToMigrate = ['users', 'customers', 'products', 'orders', 'notifications'];
-    for (const table of tablesToMigrate) {
+    // 7. Migrate existing records to the default business
+    for (const table of tablesToIsolated) {
       await pool.query(`UPDATE ${table} SET business_id = ? WHERE business_id IS NULL`, [defaultBusId]);
     }
 
     const adminHash = await bcrypt.hash("admin123", 10);
     const demoHash = await bcrypt.hash("password", 10);
     
-    // Insert admin with default business_id
+    // 8. Seed Default Data
     await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Admin User','admin@flowops.com',?,'admin')`, [defaultBusId, adminHash]);
     await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Demo Driver','driver@flowops.com',?,'driver')`, [defaultBusId, demoHash]);
     await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Demo Customer','customer@flowops.com',?,'customer')`, [defaultBusId, demoHash]);
     await pool.query(`INSERT IGNORE INTO customers (business_id, name, email, phone) VALUES (?, 'Acme Corp','contact@acme.com','555-0101'),(?, 'Globex','info@globex.com','555-0102'),(?, 'Soylent Corp','hello@soylent.com','555-0103')`, [defaultBusId, defaultBusId, defaultBusId]);
     await pool.query(`INSERT IGNORE INTO products (business_id, name, price, description) VALUES (?, 'SaaS Starter Plan',49.99,'Basic monthly subscription'),(?, 'SaaS Pro Plan',99.99,'Advanced monthly subscription'),(?, 'Enterprise License',999.00,'Yearly enterprise access')`, [defaultBusId, defaultBusId, defaultBusId]);
-    res.json({ message: "✅ Seeded and Schema Updated! Logins — admin@flowops.com/admin123 | driver@flowops.com/password | customer@flowops.com/password" });
+    
+    res.json({ message: "✅ NUCLEAR FIX APPLIED: All tables isolated and seeded!" });
   } catch (e) {
     res.status(500).json({ message: "Seed failed: " + e.message });
   }
