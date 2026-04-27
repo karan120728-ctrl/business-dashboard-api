@@ -4,14 +4,14 @@ const AppError = require("../utils/AppError");
 
 const createUser = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role, businessName, businessCode } = req.body;
         
         // Lightweight controller validation
         if (!name || !email || !password) {
             throw new AppError("Name, email, and password are required", 400);
         }
 
-        const newUser = await userService.createUser({ name, email, password, role });
+        const newUser = await userService.createUser({ name, email, password, role, businessName, businessCode });
         return sendSuccess(res, 201, newUser, "User created successfully");
     } catch (error) {
         return sendError(res, error);
