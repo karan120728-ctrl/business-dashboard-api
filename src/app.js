@@ -61,6 +61,15 @@ app.post("/api/seed", async (req, res) => {
   try {
     const { pool } = require("./db/connection");
     const bcrypt = require("bcrypt");
+    
+    // FIX LIVE SCHEMA: Update roles and add driver_id
+    await pool.query("ALTER TABLE users MODIFY role ENUM('superadmin', 'admin', 'driver', 'customer') DEFAULT 'customer'");
+    const [cols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'driver_id'");
+    if (cols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN driver_id INT NULL");
+      await pool.query("ALTER TABLE orders ADD CONSTRAINT fk_order_driver FOREIGN KEY (driver_id) REFERENCES users(id)");
+    }
+
     const adminHash = await bcrypt.hash("admin123", 10);
     const demoHash = await bcrypt.hash("password", 10);
     await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Admin User','admin@flowops.com',?,'admin')`, [adminHash]);
@@ -68,7 +77,7 @@ app.post("/api/seed", async (req, res) => {
     await pool.query(`INSERT IGNORE INTO users (name, email, password, role) VALUES ('Demo Customer','customer@flowops.com',?,'customer')`, [demoHash]);
     await pool.query(`INSERT IGNORE INTO customers (name, email, phone) VALUES ('Acme Corp','contact@acme.com','555-0101'),('Globex','info@globex.com','555-0102'),('Soylent Corp','hello@soylent.com','555-0103')`);
     await pool.query(`INSERT IGNORE INTO products (name, price, description) VALUES ('SaaS Starter Plan',49.99,'Basic monthly subscription'),('SaaS Pro Plan',99.99,'Advanced monthly subscription'),('Enterprise License',999.00,'Yearly enterprise access')`);
-    res.json({ message: "✅ Seeded! Logins — admin@flowops.com/admin123 | driver@flowops.com/password | customer@flowops.com/password" });
+    res.json({ message: "✅ Seeded and Schema Updated! Logins — admin@flowops.com/admin123 | driver@flowops.com/password | customer@flowops.com/password" });
   } catch (e) {
     res.status(500).json({ message: "Seed failed: " + e.message });
   }
