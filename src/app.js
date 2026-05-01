@@ -21,11 +21,16 @@ const PORT = process.env.PORT || 3000;
 
 // middleware
 app.use(express.json());
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://business-dashboard-api.vercel.app");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Serve uploaded proof images as static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
