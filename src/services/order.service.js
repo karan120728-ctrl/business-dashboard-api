@@ -3,8 +3,17 @@ const AppError = require("../utils/AppError");
 const { ORDER_STATUS } = require("../utils/constants");
 const notificationService = require("./notification.service");
 
-const createOrder = async (userId, businessId, data, io) => {
+const createOrder = async (user, businessId, data, io) => {
     const { customer, products } = data;
+    const userId = user.id;
+
+    // Security check: If role is customer, ensure they are ordering for themselves
+    if (user.role === 'customer') {
+        const [custRows] = await pool.query("SELECT id FROM customers WHERE email = ? AND business_id = ?", [user.email, businessId]);
+        if (custRows.length === 0 || custRows[0].id != customer) {
+            throw new AppError("You can only create orders for your own account", 403);
+        }
+    }
 
     const connection = await pool.getConnection();
     try {

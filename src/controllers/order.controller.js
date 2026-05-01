@@ -11,7 +11,7 @@ const createOrder = async (req, res) => {
         }
 
         const io = req.app.get("io");
-        const order = await orderService.createOrder(req.user.id, req.user.business_id, { customer, products }, io);
+        const order = await orderService.createOrder(req.user, req.user.business_id, { customer, products }, io);
         return sendSuccess(res, 201, { order }, "Order created successfully");
     } catch (error) {
         return sendError(res, error);

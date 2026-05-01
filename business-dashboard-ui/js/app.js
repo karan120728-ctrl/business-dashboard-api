@@ -466,12 +466,66 @@ window.deleteProduct = (id) => showConfirmModal("Delete product?", async () => {
 /* ================= ORDERS & LOGISTICS ================= */
 async function openOrderModal() {
     try {
-        const cres = await window.CustomersAPI.getAll();
         const pres = await window.ProductsAPI.getAll();
         const cSel = document.getElementById('order-customer');
         const pSel = document.getElementById('order-product');
-        if (cSel) cSel.innerHTML = '<option value="">Select Customer...</option>' + cres.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        const searchInput = document.getElementById('order-customer-search');
+        const adminSection = document.getElementById('admin-customer-selection');
+        const customerDisplay = document.getElementById('customer-info-display');
+        
+        // Populate Products
         if (pSel) pSel.innerHTML = '<option value="" data-price="0">Select Product...</option>' + pres.products.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name} (${formatCurrency(p.price)})</option>`).join('');
+
+        if (currentUser.role === 'customer') {
+            // Role: Customer - Auto select self
+            if (adminSection) adminSection.classList.add('hidden');
+            if (customerDisplay) {
+                customerDisplay.classList.remove('hidden');
+                document.getElementById('display-cust-name').innerText = currentUser.name;
+                document.getElementById('display-cust-email').innerText = currentUser.email;
+            }
+            
+            // Find customer record by email
+            const cres = await window.CustomersAPI.getAll();
+            const self = cres.customers.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+            if (self) {
+                // We must ensure the option exists so the .value assignment works
+                cSel.innerHTML = `<option value="${self.id}">${self.name}</option>`;
+                cSel.value = self.id;
+            } else {
+                showToast("Your customer profile was not found. Please contact admin.", "error");
+                return;
+            }
+        } else {
+            // Role: Admin/SuperAdmin
+            if (adminSection) adminSection.classList.remove('hidden');
+            if (customerDisplay) customerDisplay.classList.add('hidden');
+            
+            const cres = await window.CustomersAPI.getAll();
+            allCustomers = cres.customers || [];
+            
+            const renderCustOptions = (list) => {
+                cSel.innerHTML = '<option value="">Select Customer...</option>' + list.map(c => 
+                    `<option value="${c.id}">${c.name} ${c.phone ? `(${c.phone})` : `[${c.email}]`}</option>`
+                ).join('');
+            };
+            
+            renderCustOptions(allCustomers);
+
+            // Add Search logic
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.oninput = (e) => {
+                    const q = e.target.value.toLowerCase();
+                    const filtered = allCustomers.filter(c => 
+                        c.name.toLowerCase().includes(q) || 
+                        (c.phone && c.phone.includes(q)) ||
+                        c.email.toLowerCase().includes(q)
+                    );
+                    renderCustOptions(filtered);
+                };
+            }
+        }
         
         pSel.onchange = () => {
             const opt = pSel.options[pSel.selectedIndex];
@@ -482,7 +536,10 @@ async function openOrderModal() {
         document.getElementById('order-qty').oninput = pSel.onchange;
         
         openModal('modal-order');
-    } catch(e) {}
+    } catch(e) {
+        console.error(e);
+        showToast("Error loading order form", "error");
+    }
 }
 
 async function handleCreateOrder(e) {
@@ -502,7 +559,10 @@ async function handleCreateOrder(e) {
         closeModal('modal-order'); 
         loadOrders(); 
     }
-    catch(e) {} finally { setBtnLoading('btn-submit-order', false, 'Create Order'); }
+    catch(e) {
+        console.error("Order Creation Error:", e);
+        showToast(e.message || "Failed to create order", "error");
+    } finally { setBtnLoading('btn-submit-order', false, 'Create Order'); }
 }
 
 async function loadOrders() {
