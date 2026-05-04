@@ -111,16 +111,24 @@
             };
 
             try {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account...';
+                
+                // Render free tier can take up to 60s to wake up
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+
                 const response = await fetch(`${window.API_URL}/users/createUser`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
                 
                 const data = await response.json();
                 
                 if (response.ok || response.status === 201) {
-                    if (role === 'admin' && data.data.businessCode) {
+                    if (role === 'admin' && data.data && data.data.businessCode) {
                         alert(`🚀 Business Created!\n\nYour Invite Code is: ${data.data.businessCode}\n\nShare this code with your Drivers and Customers.`);
                     }
                     showToast('Account created! Redirecting to login...', 'success');
@@ -129,7 +137,13 @@
                     showToast(data.message || 'Registration failed. Please try again.', 'error');
                 }
             } catch (err) {
-                showToast('Cannot connect to server. Please try again later.', 'error');
+                if (err.name === 'AbortError') {
+                    // Server woke up but response took too long - account likely created
+                    showToast('Server is waking up. Your account may already be created. Try logging in!', 'warning');
+                    setTimeout(() => { window.location.href = 'login.html'; }, 3000);
+                } else {
+                    showToast('Cannot connect to server. Please check your connection.', 'error');
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Create Account';

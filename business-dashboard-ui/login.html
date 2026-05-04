@@ -76,11 +76,19 @@
             btn.innerHTML = 'Signing in...';
 
             try {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+                
+                // Render free tier can take up to 60s to wake up from sleep
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+
                 const response = await fetch(`${window.API_URL}/users/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ email, password }),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
                 
                 const data = await response.json();
                 
@@ -92,7 +100,11 @@
                     showToast(data.message || 'Login failed', 'error');
                 }
             } catch (err) {
-                showToast('Network error. Is the server running?', 'error');
+                if (err.name === 'AbortError') {
+                    showToast('Server is warming up. Please wait 10 seconds and try again.', 'warning');
+                } else {
+                    showToast('Network error. Please check your connection.', 'error');
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Sign In';
