@@ -6,8 +6,8 @@ const createCustomer = async (req, res) => {
     try {
         const { name, email, phone, address } = req.body;
 
-        if (!name || !email || !phone) {
-            throw new AppError("Name, email and phone are required", 400);
+        if (!name || !email) {
+            throw new AppError("Name and email are required", 400);
         }
 
         const customer = await customerService.createCustomer(req.user.business_id, { name, email, phone, address });

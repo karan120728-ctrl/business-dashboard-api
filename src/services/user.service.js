@@ -52,6 +52,15 @@ const createUser = async (userData) => {
             await connection.query("UPDATE businesses SET owner_id = ? WHERE id = ?", [userId, businessId]);
         }
 
+        // 4. Auto-create a Customer profile when role is customer
+        //    This allows them to place orders via openOrderModal() immediately
+        if (userRole === 'customer') {
+            await connection.query(
+                "INSERT IGNORE INTO customers (business_id, name, email, phone) VALUES (?, ?, ?, ?)",
+                [businessId, name, email.toLowerCase(), null]
+            );
+        }
+
         await connection.commit();
         
         // Fetch the generated code for the response if admin

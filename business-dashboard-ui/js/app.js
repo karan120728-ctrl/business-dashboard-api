@@ -544,7 +544,24 @@ async function openOrderModal() {
             
             // Find customer record by email
             const cres = await window.CustomersAPI.getAll();
-            const self = cres.customers.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+            let self = cres.customers.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+            
+            if (!self) {
+                // Auto-create customer profile to fix the button not working issue
+                try {
+                    await window.CustomersAPI.create({
+                        name: currentUser.name || 'Customer',
+                        email: currentUser.email,
+                        phone: '',
+                        address: ''
+                    });
+                    const newCres = await window.CustomersAPI.getAll();
+                    self = newCres.customers.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+                } catch(err) {
+                    console.error("Failed to auto-create customer profile:", err);
+                }
+            }
+
             if (self) {
                 // We must ensure the option exists so the .value assignment works
                 cSel.innerHTML = `<option value="${self.id}">${self.name}</option>`;
