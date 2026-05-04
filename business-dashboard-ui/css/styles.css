@@ -461,6 +461,9 @@ body.sidebar-open .main-content {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
 }
 .chart-card h3 {
     font-size: 1rem;
