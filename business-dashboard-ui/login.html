@@ -59,10 +59,11 @@
             this.classList.toggle('fa-eye-slash');
         });
 
-        async function quickLogin(email, pass) {
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = pass;
-            document.getElementById('login-form').dispatchEvent(new Event('submit'));
+        function quickLogin(email, pass) {
+            document.getElementById('email').placeholder = email;
+            document.getElementById('password').placeholder = '••••••••';
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
         }
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
