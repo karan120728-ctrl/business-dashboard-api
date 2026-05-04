@@ -50,6 +50,15 @@ function setupUI() {
         }
     });
 
+    // Handle elements that should be hidden ONLY for drivers
+    document.querySelectorAll('.driver-hidden').forEach(el => {
+        if (role === 'driver') {
+            el.classList.add('hidden');
+        } else {
+            el.classList.remove('hidden');
+        }
+    });
+
     // Sidebar Branding based on Role
     const sidebarTitle = document.querySelector('.sidebar-header h2');
     const sidebarTagline = document.querySelector('.sidebar-tagline');
