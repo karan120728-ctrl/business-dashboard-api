@@ -22,7 +22,14 @@ const PORT = process.env.PORT || 3000;
 // middleware
 app.use(express.json());
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://business-dashboard-api.vercel.app");
+  const allowedOrigins = ['https://business-dashboard-api.vercel.app', 'http://localhost:55188', 'http://localhost:60755', 'http://localhost:3000', 'http://127.0.0.1:5500'];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+      res.header("Access-Control-Allow-Origin", origin);
+  } else {
+      // Fallback for Vercel if origin header is missing in some cases
+      res.header("Access-Control-Allow-Origin", "https://business-dashboard-api.vercel.app");
+  }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
