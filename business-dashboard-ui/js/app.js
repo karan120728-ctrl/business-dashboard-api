@@ -867,7 +867,7 @@ window.copyPaymentLinkByOrderId = async (orderId) => {
         if (invoice) {
             window.copyDirectPaymentLink(invoice.payment_token);
         } else {
-            showToast("No invoice found for this order yet. Wait for delivery.", "error");
+            showToast("No invoice found for this order. It may have been delivered before the invoicing system was added.", "error");
         }
     } catch(e) {
         showToast("Error fetching invoice link.", "error");

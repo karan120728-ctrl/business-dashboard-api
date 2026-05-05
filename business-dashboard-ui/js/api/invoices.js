@@ -1,11 +1,11 @@
 const InvoicesAPI = {
     getStats: async () => {
         const res = await API.get('/invoices/stats');
-        return res.data;
+        return res;
     },
     getAll: async () => {
         const res = await API.get('/invoices');
-        return res.data;
+        return res;
     }
 };
 
