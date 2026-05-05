@@ -73,11 +73,11 @@ const initDB = async () => {
         customer_id INT NOT NULL,
         total_amount DECIMAL(10, 2) NOT NULL,
         status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending',
+        payment_status ENUM('unpaid', 'paid', 'overdue') DEFAULT 'unpaid',
         driver_id INT NULL,
         driver_name VARCHAR(255),
         vehicle_number VARCHAR(100),
         delivery_location VARCHAR(255),
-        current_address TEXT,
         current_address TEXT,
         proof_image_url LONGTEXT,
         packed_at TIMESTAMP NULL,
@@ -106,6 +106,27 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // 7. Invoices Table (Isolated)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        business_id INT NOT NULL,
+        order_id INT NOT NULL,
+        customer_id INT NOT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        status ENUM('unpaid', 'paid', 'overdue') DEFAULT 'unpaid',
+        due_date DATETIME NOT NULL,
+        payment_token VARCHAR(255) NOT NULL UNIQUE,
+        token_expires_at DATETIME NOT NULL,
+        used_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     `);
 

@@ -218,6 +218,7 @@
                 <a href="#" class="nav-link" data-view="customers" id="customers-link"><i class="fa-solid fa-users"></i> Customers</a>
                 <a href="#" class="nav-link" data-view="products" id="products-link"><i class="fa-solid fa-box"></i> Products</a>
                 <a href="#" class="nav-link" data-view="orders" id="orders-link"><i class="fa-solid fa-shopping-cart"></i> Orders</a>
+                <a href="#" class="nav-link admin-only hidden" data-view="payments" id="payments-link"><i class="fa-solid fa-file-invoice-dollar"></i> Payments</a>
                 <a href="#" class="nav-link admin-only hidden" data-view="users" id="users-link"><i class="fa-solid fa-user-shield"></i> Users</a>
             </nav>
         </aside>
@@ -307,9 +308,17 @@
                         <div class="metric-card">
                             <div class="metric-icon"><i class="fa-solid fa-chart-line"></i></div>
                             <div class="metric-data">
-                                <h3>Total Revenue</h3>
+                                <h3>Total Collected</h3>
                                 <p id="metric-revenue" class="skeleton-text">$0.00</p>
                                 <div class="growth-indicator growth-neutral">All time</div>
+                            </div>
+                        </div>
+                        <div class="metric-card" style="border: 2px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.02);">
+                            <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fa-solid fa-sack-dollar"></i></div>
+                            <div class="metric-data">
+                                <h3 style="color: #ef4444;">Total Outstanding</h3>
+                                <p id="metric-outstanding" class="skeleton-text" style="color: #ef4444;">$0.00</p>
+                                <div class="growth-indicator growth-neutral" style="color: #ef4444;">Action needed</div>
                             </div>
                         </div>
                     </div>
@@ -395,9 +404,10 @@
                                     <th>Customer</th>
                                     <th>Amount</th>
                                     <th>Date</th>
-                                    <th>Status</th>
+                                    <th>Order Status</th>
+                                    <th>Payment Status</th>
                                     <th>Change Status</th>
-                                    <th>Logistics</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="orders-tbody"></tbody>
@@ -422,6 +432,53 @@
                                 </tr>
                             </thead>
                             <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Payments View (Admin only) -->
+                <section id="view-payments" class="view hidden">
+                    <div class="metrics-grid mb-4">
+                        <div class="metric-card">
+                            <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="fa-solid fa-check-circle"></i></div>
+                            <div class="metric-data">
+                                <h3>Total Paid</h3>
+                                <p id="metric-total-paid">$0.00</p>
+                                <div class="growth-indicator" id="metric-paid-count">0 invoices</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fa-solid fa-clock"></i></div>
+                            <div class="metric-data">
+                                <h3>Total Unpaid</h3>
+                                <p id="metric-total-unpaid">$0.00</p>
+                                <div class="growth-indicator" id="metric-unpaid-count">0 invoices</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="metric-data">
+                                <h3>Total Overdue</h3>
+                                <p id="metric-total-overdue">$0.00</p>
+                                <div class="growth-indicator" id="metric-overdue-count">0 invoices</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container mt-4">
+                        <h3>Recent Invoices</h3>
+                        <table class="data-table mt-2">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Customer</th>
+                                    <th>Order #</th>
+                                    <th>Amount</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoices-tbody"></tbody>
                         </table>
                     </div>
                 </section>
@@ -587,6 +644,7 @@
     <script src="js/api/customers.js"></script>
     <script src="js/api/products.js"></script>
     <script src="js/api/orders.js"></script>
+    <script src="js/api/invoices.js"></script>
     <script src="js/api/users.js"></script>
     <script src="js/api/analytics.js"></script>
     <script src="js/app.js"></script>

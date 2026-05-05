@@ -242,6 +242,7 @@ function switchView(viewName) {
     if (viewName === 'customers') loadCustomers();
     if (viewName === 'products') loadProducts();
     if (viewName === 'orders') loadOrders();
+    if (viewName === 'payments') loadPayments();
     if (viewName === 'users') loadUsers();
 }
 
@@ -390,6 +391,7 @@ async function loadDashboard() {
         
         // Use formatCurrency which now respects activeCurrency global
         setVal('metric-revenue', formatCurrency(data.totalRevenue));
+        setVal('metric-outstanding', formatCurrency(data.outstandingAmount));
         setVal('metric-today', formatCurrency(data.todayRevenue));
         setVal('metric-weekly', formatCurrency(data.weeklyRevenue));
         setVal('metric-monthly', formatCurrency(data.monthlyRevenue));
@@ -726,12 +728,25 @@ async function loadOrders() {
                     actions += ` <button class="btn btn-primary btn-sm" onclick="openTimeline(${o.id})" title="View live driver location"><i class="fa-solid fa-map-location-dot"></i> Live Map</button>`;
                 }
             }
+            // Add copy payment link button if unpaid/overdue
+            if (isStaff && (o.payment_status === 'unpaid' || o.payment_status === 'overdue')) {
+                // Fetch invoices lazily via API or assume standard link if we had token.
+                // Since token is in invoices table, we should actually fetch it. But for UI, we can just fetch invoices when clicking.
+                // Wait, we need the token. We'll implement a fallback if token is not immediately available.
+                actions += ` <button class="btn btn-neutral btn-sm" onclick="copyPaymentLinkByOrderId(${o.id})" title="Copy Payment Link"><i class="fa-solid fa-link"></i> Link</button>`;
+            }
+
+            let pBadgeClass = 'warning';
+            if (o.payment_status === 'paid') pBadgeClass = 'success';
+            if (o.payment_status === 'overdue') pBadgeClass = 'danger';
+
             return `<tr>
                 <td>#${o.id}</td>
                 <td>${o.customer_name}</td>
                 <td>${formatCurrency(o.total_amount)}</td>
                 <td>${formatDate(o.created_at)}</td>
                 <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${o.status.toUpperCase()}</span></td>
+                <td><span class="badge badge-${pBadgeClass}">${(o.payment_status || 'unpaid').toUpperCase()}</span></td>
                 <td>
                     <select class="input" onchange="updateOrderStatus(${o.id}, this.value, ${o.driver_id || 'null'}, '${o.status}')" ${!isStaff || o.status === 'delivered' ? 'disabled' : ''}>
                         <option value="pending" ${o.status === 'pending' ? 'selected' : ''} ${o.status !== 'pending' ? 'disabled' : ''}>Pending</option>
@@ -795,6 +810,69 @@ async function forceUpdateStatus(id, status) {
         loadOrders(); 
     } catch(e) { showToast(e.message || "Failed to update status", "error"); }
 }
+
+/* ================= PAYMENTS ================= */
+async function loadPayments() {
+    try {
+        const statsRes = await window.InvoicesAPI.getStats();
+        const stats = statsRes.stats;
+        
+        document.getElementById('metric-total-paid').innerText = formatCurrency(stats.total_paid);
+        document.getElementById('metric-paid-count').innerText = `${stats.paid_count} invoices`;
+        
+        document.getElementById('metric-total-unpaid').innerText = formatCurrency(stats.total_unpaid);
+        document.getElementById('metric-unpaid-count').innerText = `${stats.unpaid_count} invoices`;
+        
+        document.getElementById('metric-total-overdue').innerText = formatCurrency(stats.total_overdue);
+        document.getElementById('metric-overdue-count').innerText = `${stats.overdue_count} invoices`;
+
+        const invRes = await window.InvoicesAPI.getAll();
+        const tbody = document.getElementById('invoices-tbody');
+        tbody.innerHTML = invRes.invoices.map(i => {
+            let pBadgeClass = 'warning';
+            if (i.status === 'paid') pBadgeClass = 'success';
+            if (i.status === 'overdue') pBadgeClass = 'danger';
+
+            let actions = '';
+            if (i.status !== 'paid') {
+                actions = `<button class="btn btn-secondary btn-sm" onclick="copyDirectPaymentLink('${i.payment_token}')"><i class="fa-solid fa-copy"></i> Link</button>`;
+            }
+
+            return `<tr>
+                <td>#${i.id}</td>
+                <td>${i.customer_name} <br><small class="text-muted">${i.customer_email}</small></td>
+                <td><a href="#" onclick="switchView('orders'); return false;">#${i.order_id}</a></td>
+                <td>${formatCurrency(i.amount)}</td>
+                <td>${formatDate(i.due_date)}</td>
+                <td><span class="badge badge-${pBadgeClass}">${i.status.toUpperCase()}</span></td>
+                <td>${actions}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+window.copyDirectPaymentLink = (token) => {
+    const url = `${window.location.origin}/business-dashboard-ui/pay.html?token=${token}`;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast("Payment link copied to clipboard!", "success");
+    });
+};
+
+window.copyPaymentLinkByOrderId = async (orderId) => {
+    try {
+        const res = await window.InvoicesAPI.getAll();
+        const invoice = res.invoices.find(i => i.order_id === orderId);
+        if (invoice) {
+            window.copyDirectPaymentLink(invoice.payment_token);
+        } else {
+            showToast("No invoice found for this order yet. Wait for delivery.", "error");
+        }
+    } catch(e) {
+        showToast("Error fetching invoice link.", "error");
+    }
+};
 
 /* ================= ADMIN LIVE MAP TRACKING ================= */
 let _adminMap = null;

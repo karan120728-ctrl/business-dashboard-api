@@ -119,6 +119,7 @@ app.get("/api/seed", async (req, res) => {
     
     // 4. Add Logistics columns to orders
     const logisticsCols = [
+      "payment_status ENUM('unpaid', 'paid', 'overdue') DEFAULT 'unpaid'",
       "driver_id INT NULL",
       "driver_name VARCHAR(255)",
       "vehicle_number VARCHAR(100)",
@@ -168,7 +169,28 @@ app.get("/api/seed", async (req, res) => {
     await pool.query(`INSERT IGNORE INTO customers (business_id, name, email, phone) VALUES (?, 'Acme Corp','contact@acme.com','555-0101'),(?, 'Globex','info@globex.com','555-0102'),(?, 'Soylent Corp','hello@soylent.com','555-0103')`, [defaultBusId, defaultBusId, defaultBusId]);
     await pool.query(`INSERT IGNORE INTO products (business_id, name, price, description) VALUES (?, 'SaaS Starter Plan',49.99,'Basic monthly subscription'),(?, 'SaaS Pro Plan',99.99,'Advanced monthly subscription'),(?, 'Enterprise License',999.00,'Yearly enterprise access')`, [defaultBusId, defaultBusId, defaultBusId]);
     
-    res.json({ message: "✅ NUCLEAR FIX APPLIED: All tables isolated and seeded!" });
+    // 9. Create Invoices Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        business_id INT NOT NULL,
+        order_id INT NOT NULL,
+        customer_id INT NOT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        status ENUM('unpaid', 'paid', 'overdue') DEFAULT 'unpaid',
+        due_date DATETIME NOT NULL,
+        payment_token VARCHAR(255) NOT NULL UNIQUE,
+        token_expires_at DATETIME NOT NULL,
+        used_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (customer_id) REFERENCES customers(id)
+      )
+    `);
+
+    res.json({ message: "✅ NUCLEAR FIX APPLIED: All tables isolated, seeded, and invoices created!" });
   } catch (e) {
     res.status(500).json({ message: "Seed failed: " + e.message });
   }
@@ -190,8 +212,15 @@ app.use("/api/orders", orderRoute);
 const notificationRoute = require("./routes/notification.route");
 app.use("/api/notifications", notificationRoute);
 
+const invoiceRoute = require("./routes/invoice.route");
+app.use("/api/invoices", invoiceRoute);
+
 const dashboardRoute = require("./routes/dashboard.route");
 app.use("/api", dashboardRoute);
+
+// start background jobs
+const { startCronJobs } = require("./utils/cronJobs");
+startCronJobs();
 
 // start server
 server.listen(PORT, () => {

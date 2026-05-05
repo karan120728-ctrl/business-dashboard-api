@@ -2,6 +2,7 @@ const { pool } = require("../db/connection");
 const AppError = require("../utils/AppError");
 const { ORDER_STATUS } = require("../utils/constants");
 const notificationService = require("./notification.service");
+const invoiceService = require("./invoice.service");
 
 const createOrder = async (user, businessId, data, io) => {
     const { customer, products } = data;
@@ -163,9 +164,15 @@ const submitProof = async (orderId, businessId, proofImage, io) => {
     const [orderRows] = await pool.query("SELECT o.*, c.email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?", [orderId]);
     if (orderRows.length > 0) {
         const order = orderRows[0];
+        
+        // Generate Invoice upon delivery
+        await invoiceService.createInvoice(businessId, orderId, order.customer_id, order.total_amount);
+
         const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
         if (customerUserRows.length > 0) {
             notificationService.createNotification(io, businessId, customerUserRows[0].id, "Package Delivered! ✅", `Order #${order.id} has been successfully delivered. Thank you!`);
+            // Add a notification for the invoice too
+            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Invoice Generated 📄", `An invoice for your recent delivery (Order #${order.id}) has been generated.`);
         }
     }
 
