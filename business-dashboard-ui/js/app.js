@@ -738,20 +738,39 @@ async function loadOrders() {
 
 window.updateOrderStatus = async (id, status) => {
     if (status === 'delivered') {
-        // If manually setting to delivered, force proof submission modal
-        showConfirmModal("To mark as Delivered, you should upload a Proof Image. Proceed to upload?", () => {
+        const role = currentUser.role;
+        if (role === 'driver') {
+            // Drivers MUST provide proof
+            showToast("Driver must provide proof image to confirm delivery", "warning");
             openSubmitProof(id);
-        });
-        // Reset dropdown to previous if possible (reload orders)
-        loadOrders();
-        return;
+            loadOrders();
+            return;
+        } else {
+            // Admins get a choice: Upload proof OR just mark as delivered
+            showConfirmModal("Mark as Delivered? You can upload a proof image or just update the status.", () => {
+                // Nested confirm for Admin convenience
+                const choice = confirm("Press OK to upload a Proof Image, or Cancel to mark as delivered without an image.");
+                if (choice) {
+                    openSubmitProof(id);
+                } else {
+                    // Admin override: No proof needed
+                    forceUpdateStatus(id, status);
+                }
+            });
+            loadOrders();
+            return;
+        }
     }
+    forceUpdateStatus(id, status);
+};
+
+async function forceUpdateStatus(id, status) {
     try { 
         await window.OrdersAPI.updateStatus(id, status); 
         showToast("Status Updated"); 
         loadOrders(); 
     } catch(e) { showToast(e.message || "Failed to update status", "error"); }
-};
+}
 
 /* ================= ADMIN LIVE MAP TRACKING ================= */
 let _adminMap = null;
