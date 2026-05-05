@@ -1075,7 +1075,7 @@ function capturePhoto() {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth; canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    const data = canvas.toDataURL('image/jpeg');
+    const data = canvas.toDataURL('image/jpeg', 0.7); // 0.7 quality reduces size by ~60%
     const img = document.getElementById('proof-preview-img');
     img.src = data; img.style.display = 'block';
     video.style.display = 'none';
