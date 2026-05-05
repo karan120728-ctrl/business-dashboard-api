@@ -737,7 +737,20 @@ async function loadOrders() {
 }
 
 window.updateOrderStatus = async (id, status) => {
-    try { await window.OrdersAPI.updateStatus(id, status); showToast("Status Updated"); loadOrders(); } catch(e) {}
+    if (status === 'delivered') {
+        // If manually setting to delivered, force proof submission modal
+        showConfirmModal("To mark as Delivered, you should upload a Proof Image. Proceed to upload?", () => {
+            openSubmitProof(id);
+        });
+        // Reset dropdown to previous if possible (reload orders)
+        loadOrders();
+        return;
+    }
+    try { 
+        await window.OrdersAPI.updateStatus(id, status); 
+        showToast("Status Updated"); 
+        loadOrders(); 
+    } catch(e) { showToast(e.message || "Failed to update status", "error"); }
 };
 
 /* ================= ADMIN LIVE MAP TRACKING ================= */
@@ -842,19 +855,24 @@ window.openTimeline = async (id) => {
         let proofDesc = '';
         if (o.proof_image_url) {
             const ts = o.delivered_at ? `Delivered at: ${formatDateTime(o.delivered_at)}` : 'Proof uploaded';
-            proofDesc = `<div style="margin-top:0.5rem;">
+            proofDesc = `<div style="margin-top:0.75rem; padding:0.5rem; background:rgba(16,185,129,0.05); border-radius:10px; border:1px solid rgba(16,185,129,0.1);">
                 <img src="${o.proof_image_url}" onclick="openImagePreview('${o.proof_image_url}', '${ts}')" 
-                    style="max-width:100%; max-height:200px; border-radius:8px; cursor:pointer; object-fit:cover; border:2px solid var(--border);"
+                    style="width:100%; max-height:220px; border-radius:8px; cursor:pointer; object-fit:cover; display:block; margin:0 auto;"
                     title="Click to view full size" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-                <div style="display:none; padding:0.5rem; background:rgba(239,68,68,0.1); border-radius:6px; font-size:0.8rem; color:#ef4444;">
-                    <i class='fa-solid fa-image-slash'></i> Proof image unavailable
+                <div style="display:none; padding:1rem; text-align:center; color:var(--text-muted);">
+                    <i class='fa-solid fa-image-slash' style='font-size:2rem; display:block; margin-bottom:0.5rem;'></i> Image failed to load
                 </div>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;">
-                    <i class='fa-solid fa-clock'></i> ${ts}
+                <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-top:0.6rem; font-size:0.75rem; color:#10b981; font-weight:600;">
+                    <i class='fa-solid fa-certificate'></i> Verified Delivery
+                </div>
+                <p style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:0.2rem;">
+                    ${ts}
                 </p>
             </div>`;
         } else if (o.status === 'delivered') {
-            proofDesc = `<span style="font-size:0.8rem; color:var(--text-muted);"><i class='fa-solid fa-image-slash'></i> No proof image uploaded</span>`;
+            proofDesc = `<div style="padding:0.75rem; background:rgba(239,68,68,0.05); border-radius:8px; border:1px dashed rgba(239,68,68,0.2); text-align:center; font-size:0.8rem; color:var(--text-muted);">
+                <i class='fa-solid fa-triangle-exclamation' style="color:#f59e0b;"></i> No proof image available for this delivery.
+            </div>`;
         }
 
         const content = document.getElementById('timeline-container');
@@ -1041,9 +1059,17 @@ async function startCameraStream() {
         video.srcObject = _cameraStream;
         video.style.display = 'block';
         document.getElementById('camera-placeholder').style.display = 'none';
+        document.getElementById('btn-capture-photo').classList.remove('hidden');
     } catch(e) { showToast("Camera access denied", "error"); }
 }
-function stopCameraStream() { if(_cameraStream) _cameraStream.getTracks().forEach(t => t.stop()); }
+function stopCameraStream() { 
+    if(_cameraStream) {
+        _cameraStream.getTracks().forEach(t => t.stop());
+        _cameraStream = null;
+    }
+    const btn = document.getElementById('btn-capture-photo');
+    if (btn) btn.classList.add('hidden');
+}
 function capturePhoto() {
     const video = document.getElementById('webcam-video');
     const canvas = document.createElement('canvas');
