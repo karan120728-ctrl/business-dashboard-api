@@ -4,14 +4,13 @@ const AppError = require("../utils/AppError");
 
 const createUser = async (req, res) => {
     try {
-        const { name, email, password, role, businessName, businessCode } = req.body;
+        const { name, email, password, role, businessName, businessCode, phone } = req.body;
         
-        // Lightweight controller validation
         if (!name || !email || !password) {
             throw new AppError("Name, email, and password are required", 400);
         }
 
-        const newUser = await userService.createUser({ name, email, password, role, businessName, businessCode });
+        const newUser = await userService.createUser({ name, email, password, role, businessName, businessCode, phone });
         return sendSuccess(res, 201, newUser, "User created successfully");
     } catch (error) {
         return sendError(res, error);
@@ -61,11 +60,8 @@ const forgotPassword = async (req, res) => {
         const { email } = req.body;
         if (!email) throw new AppError("Email is required", 400);
 
-        const token = await userService.forgotPassword(email);
-        
-        // In Dev Mode, we return the token in the response.
-        // In Production, this would be sent via email.
-        return sendSuccess(res, 200, { resetToken: token }, "Reset token generated successfully (Dev Mode)");
+        await userService.forgotPassword(email);
+        return sendSuccess(res, 200, null, "OTP sent to your email address");
     } catch (error) {
         return sendError(res, error);
     }
@@ -73,10 +69,10 @@ const forgotPassword = async (req, res) => {
 
 const resetPassword = async (req, res) => {
     try {
-        const { token, newPassword } = req.body;
-        if (!token || !newPassword) throw new AppError("Token and new password are required", 400);
+        const { otp, email, newPassword } = req.body;
+        if (!otp || !email || !newPassword) throw new AppError("OTP, email and new password are required", 400);
 
-        await userService.resetPassword(token, newPassword);
+        await userService.resetPassword(otp, email, newPassword);
         return sendSuccess(res, 200, null, "Password reset successfully");
     } catch (error) {
         return sendError(res, error);

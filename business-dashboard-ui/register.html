@@ -35,6 +35,10 @@
                 <input type="email" id="email" class="input" required placeholder="john@example.com">
             </div>
             <div class="form-group">
+                <label for="phone">Mobile Number <span style="color:var(--text-muted); font-weight:400;">(Optional)</span></label>
+                <input type="tel" id="phone" class="input" placeholder="e.g. +91 98765 43210">
+            </div>
+            <div class="form-group">
                 <label for="password">Password</label>
                 <div class="password-field">
                     <input type="password" id="password" class="input" required placeholder="••••••••" minlength="6">
@@ -92,6 +96,7 @@
             e.preventDefault();
             const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
             const password = document.getElementById('password').value;
             const role = document.getElementById('role').value;
             const businessVal = document.getElementById('business-input').value.trim();
@@ -105,7 +110,7 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account...';
 
             const payload = { 
-                name, email, password, role,
+                name, email, password, role, phone: phone || undefined,
                 businessName: role === 'admin' ? businessVal : undefined,
                 businessCode: role !== 'admin' ? businessVal : undefined
             };

@@ -3,9 +3,10 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const AppError = require("../utils/AppError");
+const { sendOTPEmail } = require("../utils/emailService");
 
 const createUser = async (userData) => {
-    const { name, email, password, role, businessName, businessCode } = userData;
+    const { name, email, password, role, businessName, businessCode, phone } = userData;
     const connection = await pool.getConnection();
 
     try {
@@ -42,8 +43,8 @@ const createUser = async (userData) => {
 
         // 2. Create User
         const [result] = await connection.query(
-            "INSERT INTO users (business_id, name, email, password, role) VALUES (?, ?, ?, ?, ?)",
-            [businessId, name, email.toLowerCase(), hashedPassword, userRole]
+            "INSERT INTO users (business_id, name, email, password, role, phone) VALUES (?, ?, ?, ?, ?, ?)",
+            [businessId, name, email.toLowerCase(), hashedPassword, userRole, phone || null]
         );
         const userId = result.insertId;
 
@@ -116,32 +117,37 @@ const loginUser = async (email, password) => {
 };
 
 const forgotPassword = async (email) => {
-    const [users] = await pool.query("SELECT id FROM users WHERE email = ?", [email.toLowerCase()]);
+    const [users] = await pool.query("SELECT id, name FROM users WHERE email = ?", [email.toLowerCase()]);
     if (users.length === 0) throw new AppError("No user found with this email", 404);
 
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    
-    // 15 min expiry
-    const expires = new Date(Date.now() + 15 * 60 * 1000);
+    const user = users[0];
 
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP hash in reset fields
     await pool.query(
         "UPDATE users SET reset_token_hash = ?, reset_expires = ? WHERE id = ?",
-        [resetTokenHash, expires, users[0].id]
+        [otpHash, expires, user.id]
     );
 
-    return resetToken; // Return raw token for "Dev Mode" display
+    // Send OTP via email
+    await sendOTPEmail(email, otp, user.name);
+
+    return true;
 };
 
-const resetPassword = async (token, newPassword) => {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+const resetPassword = async (otp, email, newPassword) => {
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
     
     const [users] = await pool.query(
-        "SELECT id FROM users WHERE reset_token_hash = ? AND reset_expires > CURRENT_TIMESTAMP",
-        [tokenHash]
+        "SELECT id FROM users WHERE email = ? AND reset_token_hash = ? AND reset_expires > CURRENT_TIMESTAMP",
+        [email.toLowerCase(), otpHash]
     );
 
-    if (users.length === 0) throw new AppError("Token is invalid or has expired", 400);
+    if (users.length === 0) throw new AppError("OTP is invalid or has expired", 400);
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query(
