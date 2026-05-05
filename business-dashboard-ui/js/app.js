@@ -706,6 +706,12 @@ async function loadOrders() {
             const isStaff = currentUser.role === 'admin' || currentUser.role === 'superadmin';
             const isDriver = currentUser.role === 'driver';
             let actions = `<button class="btn btn-secondary btn-sm" onclick="openTimeline(${o.id})"><i class="fa-solid fa-route"></i> Track</button>`;
+            
+            // Shortcut: View Proof for Delivered orders
+            if (o.status === 'delivered' && o.proof_image_url) {
+                actions += ` <button class="btn btn-success btn-sm" onclick="openImagePreview('${o.proof_image_url}', 'Order #${o.id} Proof')"><i class="fa-solid fa-image"></i> Proof</button>`;
+            }
+
             if (o.status === 'confirmed' && isStaff) actions += ` <button class="btn btn-primary btn-sm" onclick="openAssignDriver(${o.id})">Assign</button>`;
             if (o.status === 'out_for_delivery') {
                 if (isDriver) {
@@ -723,20 +729,27 @@ async function loadOrders() {
                 <td>${formatDate(o.created_at)}</td>
                 <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${o.status.toUpperCase()}</span></td>
                 <td>
-                    <select class="input" onchange="updateOrderStatus(${o.id}, this.value)" ${!isStaff ? 'disabled' : ''}>
+                    <select class="input" onchange="updateOrderStatus(${o.id}, this.value, ${o.driver_id || 'null'})" ${!isStaff ? 'disabled' : ''}>
                         <option value="pending" ${o.status === 'pending' ? 'selected' : ''}>Pending</option>
                         <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
                         <option value="out_for_delivery" ${o.status === 'out_for_delivery' ? 'selected' : ''}>Out for Delivery</option>
                         <option value="delivered" ${o.status === 'delivered' ? 'selected' : ''}>Delivered</option>
                     </select>
                 </td>
-                <td>${actions}</td>
+                <td class="table-actions">${actions}</td>
             </tr>`;
         }).join('');
-    } catch(e) {}
+    } catch(e) { console.error(e); }
 }
 
-window.updateOrderStatus = async (id, status) => {
+window.updateOrderStatus = async (id, status, driverId) => {
+    // BUSINESS RULE: Cannot go out for delivery without a driver
+    if (status === 'out_for_delivery' && (!driverId || driverId === null)) {
+        showToast("Cannot set status to 'Out for Delivery' without assigning a driver first. Use the 'Assign' button.", "error");
+        loadOrders();
+        return;
+    }
+
     if (status === 'delivered') {
         const role = currentUser.role;
         if (role === 'driver') {
