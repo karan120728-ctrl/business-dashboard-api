@@ -730,10 +730,9 @@ async function loadOrders() {
             }
             // Add copy payment link button if unpaid/overdue
             if (isStaff && (o.payment_status === 'unpaid' || o.payment_status === 'overdue')) {
-                // Fetch invoices lazily via API or assume standard link if we had token.
-                // Since token is in invoices table, we should actually fetch it. But for UI, we can just fetch invoices when clicking.
-                // Wait, we need the token. We'll implement a fallback if token is not immediately available.
-                actions += ` <button class="btn btn-neutral btn-sm" onclick="copyPaymentLinkByOrderId(${o.id})" title="Copy Payment Link"><i class="fa-solid fa-link"></i> Link</button>`;
+                actions += ` <button class="btn btn-neutral btn-sm" onclick="copyPaymentLinkByOrderId(${o.id})" title="Copy Link"><i class="fa-solid fa-link"></i></button>`;
+                actions += ` <button class="btn btn-success btn-sm" onclick="sendPaymentWhatsApp(${o.id})" title="Send via WhatsApp" style="background:#25D366; border-color:#25D366;"><i class="fa-brands fa-whatsapp"></i></button>`;
+                actions += ` <button class="btn btn-primary btn-sm" onclick="sendPaymentEmail(${o.id})" title="Send via Email"><i class="fa-solid fa-envelope"></i></button>`;
             }
 
             let pBadgeClass = 'warning';
@@ -835,7 +834,9 @@ async function loadPayments() {
 
             let actions = '';
             if (i.status !== 'paid') {
-                actions = `<button class="btn btn-secondary btn-sm" onclick="copyDirectPaymentLink('${i.payment_token}')"><i class="fa-solid fa-copy"></i> Link</button>`;
+                actions = `<button class="btn btn-neutral btn-sm" onclick="copyDirectPaymentLink('${i.payment_token}')" title="Copy Link"><i class="fa-solid fa-link"></i></button>`;
+                actions += ` <button class="btn btn-success btn-sm" onclick="sendPaymentWhatsApp(${i.order_id})" title="Send via WhatsApp" style="background:#25D366; border-color:#25D366;"><i class="fa-brands fa-whatsapp"></i></button>`;
+                actions += ` <button class="btn btn-primary btn-sm" onclick="sendPaymentEmail(${i.order_id})" title="Send via Email"><i class="fa-solid fa-envelope"></i></button>`;
             }
 
             return `<tr>
@@ -861,10 +862,25 @@ window.copyDirectPaymentLink = (token) => {
     });
 };
 
-window.copyPaymentLinkByOrderId = async (orderId) => {
+window.getInvoiceByOrderId = async (orderId) => {
     try {
         const res = await window.InvoicesAPI.getAll();
-        const invoice = res.invoices.find(i => i.order_id === orderId);
+        return res.invoices.find(i => i.order_id === orderId);
+    } catch(e) {
+        return null;
+    }
+};
+
+window.generatePaymentMessage = (invoice) => {
+    const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+    const url = `${window.location.origin}${basePath}/pay.html?token=${invoice.payment_token}`;
+    const message = `Hi ${invoice.customer_name},\n\nYour order #${invoice.order_id} has been delivered. Please pay your invoice of ${formatCurrency(invoice.amount)} securely using this link:\n${url}\n\nThank you for choosing FlowOps!`;
+    return { url, message };
+};
+
+window.copyPaymentLinkByOrderId = async (orderId) => {
+    try {
+        const invoice = await window.getInvoiceByOrderId(orderId);
         if (invoice) {
             window.copyDirectPaymentLink(invoice.payment_token);
         } else {
@@ -873,6 +889,27 @@ window.copyPaymentLinkByOrderId = async (orderId) => {
     } catch(e) {
         showToast("Error fetching invoice link.", "error");
     }
+};
+
+window.sendPaymentWhatsApp = async (orderId) => {
+    const invoice = await window.getInvoiceByOrderId(orderId);
+    if (!invoice) return showToast("No invoice found for this order.", "error");
+    
+    const { message } = window.generatePaymentMessage(invoice);
+    // If we had the phone number, we could use https://wa.me/NUMBER?text=
+    // Since phone isn't reliably retrieved here, we just open WhatsApp Web selection
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+};
+
+window.sendPaymentEmail = async (orderId) => {
+    const invoice = await window.getInvoiceByOrderId(orderId);
+    if (!invoice) return showToast("No invoice found for this order.", "error");
+    
+    const { message } = window.generatePaymentMessage(invoice);
+    const subject = `Invoice for Order #${invoice.order_id}`;
+    const emailUrl = `mailto:${invoice.customer_email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+    window.open(emailUrl, '_blank');
 };
 
 /* ================= ADMIN LIVE MAP TRACKING ================= */
