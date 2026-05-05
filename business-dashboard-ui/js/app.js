@@ -1233,7 +1233,6 @@ function playNotificationSound() {
 }
 
 /* UTILS */
-function formatCurrency(v) { return '$' + parseFloat(v || 0).toFixed(2); }
 function formatDate(d) { 
     if(!d) return '--';
     const date = new Date(d);
