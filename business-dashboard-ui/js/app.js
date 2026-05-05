@@ -1083,7 +1083,7 @@ function capturePhoto() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
     // 0.5 quality is the "sweet spot" for small size + clear proof
-    const data = canvas.toDataURL('image/jpeg', 0.5); 
+    const data = canvas.toDataURL('image/webp', 0.5); 
     
     const img = document.getElementById('proof-preview-img');
     img.src = data; 

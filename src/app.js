@@ -19,8 +19,9 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// middleware
-app.use(express.json());
+// middleware - Increased limits for proof image uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use((req, res, next) => {
   const allowedOrigins = ['https://business-dashboard-api.vercel.app', 'http://localhost:55188', 'http://localhost:60755', 'http://localhost:3000', 'http://127.0.0.1:5500'];
   const origin = req.headers.origin;
@@ -116,7 +117,7 @@ app.get("/api/seed", async (req, res) => {
       "vehicle_number VARCHAR(100)",
       "delivery_location VARCHAR(255)",
       "current_address TEXT",
-      "proof_image_url VARCHAR(255)",
+      "proof_image_url LONGTEXT",
       "packed_at TIMESTAMP NULL",
       "out_for_delivery_at TIMESTAMP NULL",
       "delivered_at TIMESTAMP NULL"
