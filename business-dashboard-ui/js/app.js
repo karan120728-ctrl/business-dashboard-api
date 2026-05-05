@@ -854,7 +854,8 @@ async function loadPayments() {
 }
 
 window.copyDirectPaymentLink = (token) => {
-    const url = `${window.location.origin}/business-dashboard-ui/pay.html?token=${token}`;
+    const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+    const url = `${window.location.origin}${basePath}/pay.html?token=${token}`;
     navigator.clipboard.writeText(url).then(() => {
         showToast("Payment link copied to clipboard!", "success");
     });
