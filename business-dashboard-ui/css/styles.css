@@ -871,22 +871,13 @@ body.sidebar-open .main-content {
     }
 }
 
-/* Mobile: hide currency toggle and rate badge to save space */
+/* Mobile: compact topbar on small screens */
 @media (max-width: 640px) {
-    #currency-toggle-wrapper {
-        display: none !important;
-    }
-    #live-rate-badge {
-        display: none !important;
-    }
     .topbar-right {
         gap: 0.5rem;
     }
     .user-info-text {
         display: none !important;
-    }
-    .notification-dropdown-wrapper {
-        margin-right: 0;
     }
 }
 

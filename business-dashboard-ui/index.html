@@ -221,6 +221,16 @@
                 <a href="#" class="nav-link admin-only hidden" data-view="payments" id="payments-link"><i class="fa-solid fa-file-invoice-dollar"></i> Payments</a>
                 <a href="#" class="nav-link admin-only hidden" data-view="users" id="users-link"><i class="fa-solid fa-user-shield"></i> Users</a>
             </nav>
+
+            <!-- Currency Toggle in Sidebar -->
+            <div style="padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); margin-top: auto;">
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">Currency</p>
+                <div style="display:flex; align-items:center; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:9999px; padding:3px; gap:2px;">
+                    <button id="btn-currency-usd" onclick="setCurrency('USD')" class="btn btn-sm" style="border-radius:9999px; padding:4px 12px; font-size:0.75rem; font-weight:700; background:var(--primary); color:#fff; border:none; flex:1;">$ USD</button>
+                    <button id="btn-currency-inr" onclick="setCurrency('INR')" class="btn btn-sm" style="border-radius:9999px; padding:4px 12px; font-size:0.75rem; font-weight:700; background:transparent; color:var(--sidebar-text); border:none; flex:1;">₹ INR</button>
+                </div>
+                <p id="live-rate-badge" style="font-size:0.65rem; color:var(--text-muted); margin-top:0.5rem; text-align:center;">1 USD = ₹—</p>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -232,13 +242,6 @@
                     <h1 id="page-title">Dashboard</h1>
                 </div>
                 <div class="topbar-right">
-                    <!-- Currency Toggle -->
-                    <div id="currency-toggle-wrapper" style="display:flex; align-items:center; background:var(--bg-card); border:1px solid var(--border); border-radius:9999px; padding:3px; gap:2px;">
-                        <button id="btn-currency-usd" onclick="setCurrency('USD')" class="btn btn-sm" style="border-radius:9999px; padding:4px 12px; font-size:0.75rem; font-weight:700; background:var(--primary); color:#fff; border:none;">$ USD</button>
-                        <button id="btn-currency-inr" onclick="setCurrency('INR')" class="btn btn-sm" style="border-radius:9999px; padding:4px 12px; font-size:0.75rem; font-weight:700; background:transparent; color:var(--text-muted); border:none;">₹ INR</button>
-                    </div>
-                    <span id="live-rate-badge" style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap;" title="Live exchange rate">1 USD = ₹—</span>
-
                     <!-- Notification Bell -->
                     <div class="notification-dropdown-wrapper">
                         <div class="notification-trigger" id="notification-trigger">
