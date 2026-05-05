@@ -387,6 +387,8 @@ async function loadDashboard() {
     try {
         const data = await window.AnalyticsAPI.getDashboard();
         const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.innerHTML = val; };
+        
+        // Use formatCurrency which now respects activeCurrency global
         setVal('metric-revenue', formatCurrency(data.totalRevenue));
         setVal('metric-today', formatCurrency(data.todayRevenue));
         setVal('metric-weekly', formatCurrency(data.weeklyRevenue));
@@ -537,26 +539,35 @@ async function handleAddProduct(e) {
     e.preventDefault();
     const rawPrice = parseFloat(document.getElementById('prod-price').value);
     const priceCurrency = document.getElementById('prod-price-currency').value || 'USD';
-    if (!document.getElementById('prod-name').value || isNaN(rawPrice) || rawPrice <= 0) {
+    const prodName = document.getElementById('prod-name').value;
+
+    if (!prodName || isNaN(rawPrice) || rawPrice <= 0) {
         return showToast('Name and a valid price are required', 'error');
     }
+    
     // Always store in USD — convert if INR was entered
     const priceInUSD = toUSD(rawPrice, priceCurrency);
     const data = { 
-        name: document.getElementById('prod-name').value, 
+        name: prodName, 
         price: parseFloat(priceInUSD.toFixed(4)), 
         description: document.getElementById('prod-desc').value 
     };
+    
     setBtnLoading('btn-submit-product', true, 'Save Product');
     try { 
         await window.ProductsAPI.create(data); 
-        showToast('Product Added! Price saved as ' + formatCurrencyPlain(priceInUSD) + ' (USD)');
+        // Feedback based on input currency
+        const displayPrice = priceCurrency === 'INR' ? `₹${rawPrice.toLocaleString('en-IN')}` : `$${rawPrice.toFixed(2)}`;
+        showToast(`Product Added! Price: ${displayPrice}`);
+        
         closeModal('modal-product');
         // Reset form
         document.getElementById('prod-name').value = '';
         document.getElementById('prod-price').value = '';
         document.getElementById('prod-desc').value = '';
-        document.getElementById('prod-price-converted').innerText = '';
+        if (document.getElementById('prod-price-converted')) {
+            document.getElementById('prod-price-converted').innerText = '';
+        }
         loadProducts(); 
     }
     catch(e) { showToast(e.message || 'Failed to add product', 'error'); }
