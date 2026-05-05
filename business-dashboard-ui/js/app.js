@@ -4,7 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
         return;
     }
-    if (token) initApp();
+    if (token) {
+        // Fetch live rate first, then init app
+        fetchLiveRate().finally(() => {
+            initApp();
+            // Apply saved currency preference to toggle buttons
+            setTimeout(() => { if (typeof setCurrency === 'function') setCurrency(activeCurrency); }, 100);
+        });
+    }
 });
 
 let currentUser = null;
@@ -344,6 +351,26 @@ function initModals() {
     bindForm('assign-driver-form', handleAssignDriver);
     bindForm('submit-proof-form', handleSubmitProof);
 
+    // Live price conversion preview in Add Product form
+    const priceInput = document.getElementById('prod-price');
+    const priceCurrSel = document.getElementById('prod-price-currency');
+    const priceConverted = document.getElementById('prod-price-converted');
+    const updatePricePreview = () => {
+        if (!priceInput || !priceCurrSel || !priceConverted) return;
+        const val = parseFloat(priceInput.value);
+        if (isNaN(val) || val <= 0) { priceConverted.innerText = ''; return; }
+        const currency = priceCurrSel.value;
+        if (currency === 'INR') {
+            const usd = val / LIVE_INR_RATE;
+            priceConverted.innerHTML = `<i class='fa-solid fa-arrows-rotate' style='font-size:0.7rem'></i> = $${usd.toFixed(2)} USD (stored internally)`;
+        } else {
+            const inr = val * LIVE_INR_RATE;
+            priceConverted.innerHTML = `<i class='fa-solid fa-arrows-rotate' style='font-size:0.7rem'></i> = ₹${Math.round(inr).toLocaleString('en-IN')} INR`;
+        }
+    };
+    if (priceInput) priceInput.addEventListener('input', updatePricePreview);
+    if (priceCurrSel) priceCurrSel.addEventListener('change', updatePricePreview);
+
     // Interval for Auto-polling
     setInterval(() => {
         const currentView = document.querySelector('.view:not(.hidden)');
@@ -487,33 +514,53 @@ async function loadProducts() {
     try {
         const res = await window.ProductsAPI.getAll();
         const items = res.products || [];
-        tbody.innerHTML = items.length ? items.map(p => `
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No products yet. Add your first product!</td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(p => `
             <tr>
                 <td>${p.name}</td>
                 <td>${formatCurrency(p.price)}</td>
                 <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td><button class="btn btn-secondary btn-sm" onclick="deleteProduct(${p.id})"><i class="fa-solid fa-trash"></i></button></td>
             </tr>
-        `).join('') : '<tr><td colspan="4">No products found.</td></tr>';
-    } catch(e) {}
+        `).join('');
+        // innerHTML needed for formatCurrency HTML
+        tbody.querySelectorAll('td:nth-child(2)').forEach((td, i) => {
+            td.innerHTML = formatCurrency(items[i].price);
+        });
+    } catch(e) { console.error('loadProducts error:', e); }
 }
 
 async function handleAddProduct(e) {
     e.preventDefault();
+    const rawPrice = parseFloat(document.getElementById('prod-price').value);
+    const priceCurrency = document.getElementById('prod-price-currency').value || 'USD';
+    if (!document.getElementById('prod-name').value || isNaN(rawPrice) || rawPrice <= 0) {
+        return showToast('Name and a valid price are required', 'error');
+    }
+    // Always store in USD — convert if INR was entered
+    const priceInUSD = toUSD(rawPrice, priceCurrency);
     const data = { 
         name: document.getElementById('prod-name').value, 
-        price: parseFloat(document.getElementById('prod-price').value), 
+        price: parseFloat(priceInUSD.toFixed(4)), 
         description: document.getElementById('prod-desc').value 
     };
-    if (!data.name || isNaN(data.price)) return showToast("Name and price required", "error");
     setBtnLoading('btn-submit-product', true, 'Save Product');
     try { 
         await window.ProductsAPI.create(data); 
-        showToast("Product Added!"); 
-        closeModal('modal-product'); 
+        showToast('Product Added! Price saved as ' + formatCurrencyPlain(priceInUSD) + ' (USD)');
+        closeModal('modal-product');
+        // Reset form
+        document.getElementById('prod-name').value = '';
+        document.getElementById('prod-price').value = '';
+        document.getElementById('prod-desc').value = '';
+        document.getElementById('prod-price-converted').innerText = '';
         loadProducts(); 
     }
-    catch(e) {} finally { setBtnLoading('btn-submit-product', false, 'Save Product'); }
+    catch(e) { showToast(e.message || 'Failed to add product', 'error'); }
+    finally { setBtnLoading('btn-submit-product', false, 'Save Product'); }
 }
 
 window.deleteProduct = (id) => showConfirmModal("Delete product?", async () => {
