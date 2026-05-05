@@ -1420,6 +1420,10 @@ function renderNotifications() {
 function markNotificationsAsRead() {
     const countBadge = document.getElementById('notification-count');
     if (countBadge) countBadge.classList.add('hidden');
+    // Mark all as read locally so renderNotifications() doesn't bring the badge back
+    notifications.forEach(n => n.is_read = 1);
+    // Also persist to server silently
+    try { window.Api.patch('/notifications/read-all'); } catch(e) {}
 }
 
 function playNotificationSound() {
