@@ -707,12 +707,16 @@ async function loadOrders() {
             const isDriver = currentUser.role === 'driver';
             let actions = `<button class="btn btn-secondary btn-sm" onclick="openTimeline(${o.id})"><i class="fa-solid fa-route"></i> Track</button>`;
             
-            // Shortcut: View Proof for Delivered orders
             if (o.status === 'delivered' && o.proof_image_url) {
                 actions += ` <button class="btn btn-success btn-sm" onclick="openImagePreview('${o.proof_image_url}', 'Order #${o.id} Proof')"><i class="fa-solid fa-image"></i> Proof</button>`;
             }
 
-            if (o.status === 'confirmed' && isStaff) actions += ` <button class="btn btn-primary btn-sm" onclick="openAssignDriver(${o.id})">Assign</button>`;
+            // Allow assignment if confirmed OR out_for_delivery (for re-assignment/substitution)
+            if ((o.status === 'confirmed' || o.status === 'out_for_delivery') && isStaff) {
+                const btnText = o.status === 'out_for_delivery' ? 'Re-assign' : 'Assign';
+                actions += ` <button class="btn btn-primary btn-sm" onclick="openAssignDriver(${o.id})">${btnText}</button>`;
+            }
+
             if (o.status === 'out_for_delivery') {
                 if (isDriver) {
                     actions += ` <button class="btn btn-warning btn-sm" onclick="openDriverTracking(${o.id})"><i class="fa-solid fa-location-crosshairs"></i> GPS</button>`;
@@ -729,9 +733,9 @@ async function loadOrders() {
                 <td>${formatDate(o.created_at)}</td>
                 <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${o.status.toUpperCase()}</span></td>
                 <td>
-                    <select class="input" onchange="updateOrderStatus(${o.id}, this.value, ${o.driver_id || 'null'})" ${!isStaff ? 'disabled' : ''}>
-                        <option value="pending" ${o.status === 'pending' ? 'selected' : ''}>Pending</option>
-                        <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+                    <select class="input" onchange="updateOrderStatus(${o.id}, this.value, ${o.driver_id || 'null'}, '${o.status}')" ${!isStaff || o.status === 'delivered' ? 'disabled' : ''}>
+                        <option value="pending" ${o.status === 'pending' ? 'selected' : ''} ${o.status !== 'pending' ? 'disabled' : ''}>Pending</option>
+                        <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''} ${o.status === 'out_for_delivery' ? 'disabled' : ''}>Confirmed</option>
                         <option value="out_for_delivery" ${o.status === 'out_for_delivery' ? 'selected' : ''}>Out for Delivery</option>
                         <option value="delivered" ${o.status === 'delivered' ? 'selected' : ''}>Delivered</option>
                     </select>
@@ -742,10 +746,17 @@ async function loadOrders() {
     } catch(e) { console.error(e); }
 }
 
-window.updateOrderStatus = async (id, status, driverId) => {
-    // BUSINESS RULE: Cannot go out for delivery without a driver
+window.updateOrderStatus = async (id, status, driverId, currentStatus) => {
+    // BUSINESS RULE: Cannot move back from Delivered
+    if (currentStatus === 'delivered' && status !== 'delivered') {
+        showToast("Cannot change status of a Delivered order.", "error");
+        loadOrders();
+        return;
+    }
+
+    // BUSINESS RULE: Cannot go out for delivery without a driver via dropdown
     if (status === 'out_for_delivery' && (!driverId || driverId === null)) {
-        showToast("Cannot set status to 'Out for Delivery' without assigning a driver first. Use the 'Assign' button.", "error");
+        showToast("Use the 'Assign' button to set an order to Out for Delivery.", "error");
         loadOrders();
         return;
     }
