@@ -175,7 +175,7 @@
                     throw new Error(data.message || 'Failed to load invoice');
                 }
 
-                const invoice = data.data.invoice;
+                const invoice = data.invoice;
                 
                 // Populate data
                 document.getElementById('business-name').textContent = invoice.business_name;
