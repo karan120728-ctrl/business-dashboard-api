@@ -152,8 +152,11 @@ const resetPassword = async (token, newPassword) => {
     return true;
 };
 
-const getAllUsers = async () => {
-    const [users] = await pool.query("SELECT id, business_id, name, email, role, is_active, created_at FROM users");
+const getAllUsers = async (businessId) => {
+    const [users] = await pool.query(
+        "SELECT id, business_id, name, email, role, is_active, created_at FROM users WHERE business_id = ? AND role != 'superadmin'",
+        [businessId]
+    );
     return users;
 };
 

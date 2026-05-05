@@ -36,7 +36,10 @@ const loginUser = async (req, res) => {
 
 const getUser = async (req, res) => {
     try {
-        const users = await userService.getAllUsers();
+        if (!req.user || !req.user.business_id) {
+            return sendError(res, new Error("Unauthorized: Business ID missing"), 401);
+        }
+        const users = await userService.getAllUsers(req.user.business_id);
         return sendSuccess(res, 200, users);
     } catch (error) {
         return sendError(res, error);

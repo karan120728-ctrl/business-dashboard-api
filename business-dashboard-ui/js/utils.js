@@ -12,13 +12,33 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
+const INR_RATE = 83.5; // 1 USD = 83.5 INR (update as needed)
+
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+    const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format((amount || 0) * INR_RATE);
+    return `${usd} <span style="color:var(--text-muted); font-size:0.85em;">/ ${inr}</span>`;
+}
+
+function formatCurrencyPlain(amount) {
+    // Plain text version without HTML span (for titles/attributes)
+    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+    const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format((amount || 0) * INR_RATE);
+    return `${usd} / ${inr}`;
 }
 
 function formatDate(dateString) {
+    if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric', month: 'short', day: 'numeric'
+    });
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
     });
 }
 

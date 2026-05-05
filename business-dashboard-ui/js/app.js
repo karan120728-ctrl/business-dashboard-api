@@ -27,7 +27,7 @@ function setupUI() {
         'customers-link': ['superadmin', 'admin'],
         'products-link': ['superadmin', 'admin'],
         'orders-link': ['superadmin', 'admin', 'driver', 'customer'],
-        'users-link': ['superadmin']
+        'users-link': ['superadmin', 'admin']
     };
 
     Object.keys(links).forEach(id => {
@@ -359,7 +359,7 @@ function initModals() {
 async function loadDashboard() {
     try {
         const data = await window.AnalyticsAPI.getDashboard();
-        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; };
+        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.innerHTML = val; };
         setVal('metric-revenue', formatCurrency(data.totalRevenue));
         setVal('metric-today', formatCurrency(data.todayRevenue));
         setVal('metric-weekly', formatCurrency(data.weeklyRevenue));
@@ -649,9 +649,14 @@ async function loadOrders() {
             const isDriver = currentUser.role === 'driver';
             let actions = `<button class="btn btn-secondary btn-sm" onclick="openTimeline(${o.id})"><i class="fa-solid fa-route"></i> Track</button>`;
             if (o.status === 'confirmed' && isStaff) actions += ` <button class="btn btn-primary btn-sm" onclick="openAssignDriver(${o.id})">Assign</button>`;
-            if (o.status === 'out_for_delivery' && isDriver) {
-                actions += ` <button class="btn btn-warning btn-sm" onclick="openDriverTracking(${o.id})">GPS</button>`;
-                actions += ` <button class="btn btn-success btn-sm" onclick="openSubmitProof(${o.id})">Proof</button>`;
+            if (o.status === 'out_for_delivery') {
+                if (isDriver) {
+                    actions += ` <button class="btn btn-warning btn-sm" onclick="openDriverTracking(${o.id})"><i class="fa-solid fa-location-crosshairs"></i> GPS</button>`;
+                    actions += ` <button class="btn btn-success btn-sm" onclick="openSubmitProof(${o.id})"><i class="fa-solid fa-camera"></i> Proof</button>`;
+                }
+                if (isStaff) {
+                    actions += ` <button class="btn btn-primary btn-sm" onclick="openTimeline(${o.id})" title="View live driver location"><i class="fa-solid fa-map-location-dot"></i> Live Map</button>`;
+                }
             }
             return `<tr>
                 <td>#${o.id}</td>
@@ -677,29 +682,181 @@ window.updateOrderStatus = async (id, status) => {
     try { await window.OrdersAPI.updateStatus(id, status); showToast("Status Updated"); loadOrders(); } catch(e) {}
 };
 
-window.openTimeline = async (id) => {
-    const orders = await window.OrdersAPI.getAll();
-    const o = orders.find(x => x.id == id);
-    if (!o) return;
-    const statusOrder = ['pending', 'confirmed', 'out_for_delivery', 'delivered'];
-    const curIdx = statusOrder.indexOf(o.status);
-    const mkNode = (title, date, icon, color, desc, step) => {
-        const active = step <= curIdx;
-        return `<div class="timeline-item ${active ? 'active' : ''}">
-            <div class="timeline-icon" style="background:${active ? color : '#e2e8f0'}"><i class="${icon}"></i></div>
-            <div class="timeline-content">
-                <div class="timeline-header"><h5>${title}</h5><span class="timeline-date">${date ? formatDate(date) : (active ? 'In Progress' : 'Pending')}</span></div>
-                ${desc ? `<p class="timeline-desc">${desc}</p>` : ''}
-            </div>
-        </div>`;
-    };
-    const driverDesc = o.driver_name ? `Driver: ${o.driver_name} (${o.vehicle_number})` : 'Awaiting assignment';
-    const content = document.getElementById('timeline-container');
-    content.innerHTML = mkNode('Order Placed', o.created_at, 'fa-solid fa-receipt', '#10b981', '', 0) +
-                        mkNode('Confirmed & Packed', o.packed_at || (curIdx >= 1 ? o.created_at : null), 'fa-solid fa-box', '#3b82f6', '', 1) +
-                        mkNode('Out for Delivery', o.out_for_delivery_at, 'fa-solid fa-truck', '#f59e0b', driverDesc, 2) +
-                        mkNode('Delivered ✅', o.delivered_at, 'fa-solid fa-check', '#10b981', o.proof_image_url ? 'Delivery proof uploaded' : '', 3);
+/* ================= ADMIN LIVE MAP TRACKING ================= */
+let _adminMap = null;
+let _adminMapMarker = null;
+let _adminPollInterval = null;
+let _adminTrackingOrderId = null;
+
+window.openAdminLiveMap = async (orderId) => {
+    _adminTrackingOrderId = orderId;
     openModal('order-timeline-modal');
+
+    // Small delay to ensure the modal/map div is visible
+    setTimeout(async () => {
+        const liveSection = document.getElementById('live-map-section');
+        if (liveSection) liveSection.style.display = 'block';
+
+        const mapDiv = document.getElementById('timeline-map');
+        if (!mapDiv) return;
+
+        // Destroy old map if exists
+        if (_adminMap) { _adminMap.remove(); _adminMap = null; }
+
+        // Default center: New Delhi
+        const defaultLat = 28.6139, defaultLng = 77.2090;
+        _adminMap = L.map(mapDiv).setView([defaultLat, defaultLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(_adminMap);
+
+        const driverIcon = L.divIcon({
+            className: '',
+            html: '<div style="background:#4f46e5;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;"><i class="fa-solid fa-truck" style="font-size:14px;"></i></div>',
+            iconSize: [32, 32], iconAnchor: [16, 16]
+        });
+        _adminMapMarker = L.marker([defaultLat, defaultLng], { icon: driverIcon }).addTo(_adminMap);
+        _adminMapMarker.bindPopup('<b>Driver Location</b><br>Waiting for GPS...').openPopup();
+
+        // Immediate fetch
+        await _fetchAdminLocation();
+
+        // Start polling every 5 seconds as Socket.io fallback
+        if (_adminPollInterval) clearInterval(_adminPollInterval);
+        _adminPollInterval = setInterval(_fetchAdminLocation, 5000);
+    }, 300);
+};
+
+const _fetchAdminLocation = async () => {
+    if (!_adminTrackingOrderId || !_adminMap) return;
+    try {
+        const data = await window.OrdersAPI.getLocation(_adminTrackingOrderId);
+        if (data && data.delivery_location) {
+            const [lat, lng] = data.delivery_location.split(',').map(Number);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                _adminMap.setView([lat, lng], 15);
+                _adminMapMarker.setLatLng([lat, lng]);
+                const label = data.driver_name ? `${data.driver_name} (${data.vehicle_number})` : 'Driver';
+                _adminMapMarker.getPopup().setContent(`<b>${label}</b><br>Last updated: ${new Date().toLocaleTimeString()}`);
+                document.getElementById('live-map-timestamp').innerText = `Updated: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('live-driver-info').innerHTML = data.driver_name
+                    ? `<i class='fa-solid fa-truck'></i> <b>${data.driver_name}</b> — Vehicle: ${data.vehicle_number || 'N/A'}`
+                    : '<i class="fa-solid fa-clock"></i> Waiting for driver to start GPS...';
+                const gmapsLink = document.getElementById('link-admin-google-maps');
+                if (gmapsLink) { gmapsLink.href = `https://www.google.com/maps?q=${lat},${lng}`; gmapsLink.style.display = 'flex'; }
+            }
+        }
+    } catch(e) { /* silent fail on poll */ }
+};
+
+// Stop polling when the modal closes
+document.addEventListener('click', (e) => {
+    if (e.target.closest('.modal-close') && _adminPollInterval) {
+        clearInterval(_adminPollInterval);
+        _adminPollInterval = null;
+        _adminTrackingOrderId = null;
+    }
+});
+
+window.openTimeline = async (id) => {
+    try {
+        const orders = await window.OrdersAPI.getAll();
+        const o = orders.find(x => x.id == id);
+        if (!o) return showToast('Order not found', 'error');
+
+        const statusOrder = ['pending', 'confirmed', 'out_for_delivery', 'delivered'];
+        const curIdx = statusOrder.indexOf(o.status);
+
+        const mkNode = (title, date, icon, color, desc, step) => {
+            const active = step <= curIdx;
+            return `<div class="timeline-item ${active ? 'active' : ''}">
+                <div class="timeline-icon" style="background:${active ? color : '#e2e8f0'}"><i class="${icon}"></i></div>
+                <div class="timeline-content">
+                    <div class="timeline-header"><h5>${title}</h5><span class="timeline-date">${date ? formatDateTime(date) : (active ? 'In Progress' : 'Pending')}</span></div>
+                    ${desc ? `<p class="timeline-desc">${desc}</p>` : ''}
+                </div>
+            </div>`;
+        };
+
+        const driverDesc = o.driver_name ? `<i class='fa-solid fa-user'></i> ${o.driver_name} &nbsp;|&nbsp; <i class='fa-solid fa-car'></i> ${o.vehicle_number || 'N/A'}` : 'Awaiting assignment';
+
+        // Build proof section
+        let proofDesc = '';
+        if (o.proof_image_url) {
+            const ts = o.delivered_at ? `Delivered at: ${formatDateTime(o.delivered_at)}` : 'Proof uploaded';
+            proofDesc = `<div style="margin-top:0.5rem;">
+                <img src="${o.proof_image_url}" onclick="openImagePreview('${o.proof_image_url}', '${ts}')" 
+                    style="max-width:100%; max-height:200px; border-radius:8px; cursor:pointer; object-fit:cover; border:2px solid var(--border);"
+                    title="Click to view full size" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                <div style="display:none; padding:0.5rem; background:rgba(239,68,68,0.1); border-radius:6px; font-size:0.8rem; color:#ef4444;">
+                    <i class='fa-solid fa-image-slash'></i> Proof image unavailable
+                </div>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;">
+                    <i class='fa-solid fa-clock'></i> ${ts}
+                </p>
+            </div>`;
+        } else if (o.status === 'delivered') {
+            proofDesc = `<span style="font-size:0.8rem; color:var(--text-muted);"><i class='fa-solid fa-image-slash'></i> No proof image uploaded</span>`;
+        }
+
+        const content = document.getElementById('timeline-container');
+        content.innerHTML =
+            mkNode('Order Placed', o.created_at, 'fa-solid fa-receipt', '#10b981', '', 0) +
+            mkNode('Confirmed & Packed', o.packed_at || (curIdx >= 1 ? o.created_at : null), 'fa-solid fa-box', '#3b82f6', '', 1) +
+            mkNode('Out for Delivery', o.out_for_delivery_at, 'fa-solid fa-truck', '#f59e0b', driverDesc, 2) +
+            mkNode('Delivered ✅', o.delivered_at, 'fa-solid fa-check', '#10b981', proofDesc, 3);
+
+        // Show live map for admins if out_for_delivery
+        const liveSection = document.getElementById('live-map-section');
+        if (liveSection) {
+            const isAdminOrCustomer = ['admin', 'superadmin', 'customer'].includes(currentUser.role);
+            if (o.status === 'out_for_delivery' && isAdminOrCustomer) {
+                liveSection.style.display = 'block';
+            } else {
+                liveSection.style.display = 'none';
+            }
+        }
+
+        openModal('order-timeline-modal');
+
+        // If out_for_delivery, init admin map
+        if (o.status === 'out_for_delivery') {
+            _adminTrackingOrderId = id;
+            setTimeout(async () => {
+                const mapDiv = document.getElementById('timeline-map');
+                if (!mapDiv) return;
+                if (_adminMap) { _adminMap.remove(); _adminMap = null; }
+                if (_adminPollInterval) clearInterval(_adminPollInterval);
+
+                const defaultLat = 28.6139, defaultLng = 77.2090;
+                _adminMap = L.map(mapDiv).setView([defaultLat, defaultLng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(_adminMap);
+
+                const driverIcon = L.divIcon({
+                    className: '',
+                    html: '<div style="background:#4f46e5;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;"><i class="fa-solid fa-truck" style="font-size:14px;"></i></div>',
+                    iconSize: [32, 32], iconAnchor: [16, 16]
+                });
+                _adminMapMarker = L.marker([defaultLat, defaultLng], { icon: driverIcon }).addTo(_adminMap)
+                    .bindPopup('<b>Driver</b><br>Waiting for GPS signal...').openPopup();
+
+                await _fetchAdminLocation();
+                _adminPollInterval = setInterval(_fetchAdminLocation, 5000);
+            }, 300);
+        }
+    } catch(e) {
+        console.error('Timeline error:', e);
+        showToast('Failed to load order timeline', 'error');
+    }
+};
+
+// Full screen image preview
+window.openImagePreview = (src, caption) => {
+    document.getElementById('full-screen-img').src = src;
+    document.getElementById('full-screen-img-caption').innerText = caption || '';
+    openModal('image-preview-modal');
 };
 
 /* ================= LOGISTICS TOOLS ================= */
@@ -738,6 +895,27 @@ window.openDriverTracking = (id) => {
     _trackingOrderId = id;
     document.getElementById('tracking-order-id').value = id;
     openModal('driver-tracking-modal');
+
+    // Init Leaflet map for driver tracking modal
+    setTimeout(() => {
+        const mapDiv = document.getElementById('tracking-map');
+        if (!mapDiv) return;
+        if (_trackingMap) { _trackingMap.remove(); _trackingMap = null; }
+
+        const defaultLat = 28.6139, defaultLng = 77.2090;
+        _trackingMap = L.map(mapDiv).setView([defaultLat, defaultLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(_trackingMap);
+
+        const myIcon = L.divIcon({
+            className: '',
+            html: '<div style="background:#10b981;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;"><i class="fa-solid fa-location-dot" style="font-size:14px;"></i></div>',
+            iconSize: [32, 32], iconAnchor: [16, 16]
+        });
+        _trackingMarker = L.marker([defaultLat, defaultLng], { icon: myIcon }).addTo(_trackingMap);
+        _trackingMarker.bindPopup('Your Location').openPopup();
+    }, 300);
 };
 
 function startGpsTracking() {
@@ -753,11 +931,24 @@ function startGpsTracking() {
         if (accuracy > 150) return;
         document.getElementById('tracking-coords').innerText = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
         document.getElementById('tracking-accuracy').innerText = `Accuracy: ${accuracy.toFixed(1)}m`;
-        await window.OrdersAPI.updateLocation(_trackingOrderId, { lat, lng });
+
+        // Update driver's map marker
+        if (_trackingMap && _trackingMarker) {
+            _trackingMap.setView([lat, lng], 15);
+            _trackingMarker.setLatLng([lat, lng]);
+            _trackingMarker.getPopup().setContent(`Your Location<br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`);
+        }
+
+        // Send to backend + broadcast via socket
+        try {
+            await window.OrdersAPI.updateLocation(_trackingOrderId, { lat, lng });
+        } catch(err) {
+            console.error('Location update failed:', err);
+        }
     }, (err) => {
-        showToast("GPS Error: " + err.message, "error");
+        showToast('GPS Error: ' + err.message, 'error');
         stopGpsTracking();
-    }, { enableHighAccuracy: true });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 }
 
 function stopGpsTracking() { 
