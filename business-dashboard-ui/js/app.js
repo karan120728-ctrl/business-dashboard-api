@@ -1072,19 +1072,22 @@ function stopCameraStream() {
 }
 function capturePhoto() {
     const video = document.getElementById('webcam-video');
-    // High-efficiency resizing
-    const MAX_WIDTH = 800;
+    // High-efficiency resizing for Cloud DB compatibility
+    const MAX_WIDTH = 640; 
     const scale = Math.min(1, MAX_WIDTH / video.videoWidth);
-    const canvas = document.createElement('canvas');
+    const canvas = document.getElementById('capture-canvas');
     canvas.width = video.videoWidth * scale;
     canvas.height = video.videoHeight * scale;
     
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
-    const data = canvas.toDataURL('image/jpeg', 0.6); // Compress and resize
+    // 0.5 quality is the "sweet spot" for small size + clear proof
+    const data = canvas.toDataURL('image/jpeg', 0.5); 
+    
     const img = document.getElementById('proof-preview-img');
-    img.src = data; img.style.display = 'block';
+    img.src = data; 
+    img.style.display = 'block';
     video.style.display = 'none';
     stopCameraStream();
     document.getElementById('submit-proof-submit').disabled = false;
