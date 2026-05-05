@@ -44,7 +44,14 @@ app.use((req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // connect DB and initialize tables
-connectDB().then(() => {
+connectDB().then(async () => {
+  // Direct Migration Force
+  try {
+    await pool.query("ALTER TABLE orders MODIFY COLUMN proof_image_url LONGTEXT;");
+    console.log("✅ DATABASE MIGRATION: proof_image_url forced to LONGTEXT");
+  } catch(e) {
+    console.log("Database migration note:", e.message);
+  }
   initDB();
 });
 
