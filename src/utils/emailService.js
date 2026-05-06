@@ -13,17 +13,17 @@ const sendOTPEmail = async (toEmail, otp, userName) => {
     const pass = rawPass.replace(/\s+/g, '');
 
     const transporter = nodemailer.createTransport({
-        service: 'gmail',
         host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        port: 587,
+        secure: false, // Use STARTTLS
         auth: {
             user: user,
             pass: pass
         },
-        family: 4, // Force IPv4 to avoid ENETUNREACH issues on some cloud networks
-        connectionTimeout: 10000,
-        timeout: 10000
+        family: 4, // Force IPv4
+        connectionTimeout: 30000, // 30 seconds
+        greetingTimeout: 30000,
+        socketTimeout: 30000
     });
 
     const mailOptions = {
