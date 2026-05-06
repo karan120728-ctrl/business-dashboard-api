@@ -2,13 +2,35 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 5000,
+    socketTimeout: 15000
 });
 
+// Verify connection on startup
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter.verify((error, success) => {
+        if (error) {
+            console.error('📧 Email Service Error:', error.message);
+        } else {
+            console.log('📧 Email Service is ready to send messages');
+        }
+    });
+}
+
 const sendOTPEmail = async (toEmail, otp, userName) => {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.error("❌ Email credentials missing in .env file!");
+        throw new Error("Email service is not configured on the server.");
+    }
+
     const mailOptions = {
         from: `"FlowOps Security" <${process.env.EMAIL_USER}>`,
         to: toEmail,
@@ -37,7 +59,14 @@ const sendOTPEmail = async (toEmail, otp, userName) => {
         `
     };
 
-    return transporter.sendMail(mailOptions);
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ OTP Email sent:', info.messageId);
+        return info;
+    } catch (error) {
+        console.error('❌ Failed to send OTP email:', error.message);
+        throw new Error("Failed to send email. Please check server logs.");
+    }
 };
 
 module.exports = { sendOTPEmail };
