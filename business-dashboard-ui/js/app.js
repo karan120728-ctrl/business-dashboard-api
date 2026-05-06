@@ -333,6 +333,10 @@ function initModals() {
     bind('btn-start-tracking', startGpsTracking);
     bind('btn-stop-tracking', stopGpsTracking);
     bind('btn-manual-search', handleManualLocationSearch);
+    
+    // File input fallback for Camera
+    const proofInput = document.getElementById('proof-file-input');
+    if (proofInput) proofInput.onchange = handleProofFileUpload;
 
     // Close buttons
     document.querySelectorAll('.modal-close, .close-modal, .close-modal-btn').forEach(btn => {
@@ -1153,37 +1157,66 @@ window.openDriverTracking = (id) => {
     }, 300);
 };
 
-function startGpsTracking() {
+async function startGpsTracking() {
     _trackingOrderId = document.getElementById('tracking-order-id').value;
+    
+    // Check permissions first to give better feedback
+    if (navigator.permissions && navigator.permissions.query) {
+        try {
+            const status = await navigator.permissions.query({ name: 'geolocation' });
+            if (status.state === 'denied') {
+                alert("📍 Location Access Blocked!\n\nPlease click the lock icon in your browser URL bar and set Location to 'Allow', then refresh the page.");
+                return;
+            }
+        } catch(e) {}
+    }
+
     document.getElementById('btn-start-tracking').disabled = true;
     document.getElementById('btn-stop-tracking').disabled = false;
     document.getElementById('tracking-status-badge').innerHTML = '<span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block; animation: pulse 1s infinite;"></span> GPS Active';
     document.getElementById('tracking-status-badge').style.color = '#10b981';
     document.getElementById('tracking-status-badge').style.background = 'rgba(16,185,129,0.1)';
 
+    // Request high accuracy position once to force the system prompt
+    navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true });
+
     _gpsWatchId = navigator.geolocation.watchPosition(async (pos) => {
         const { latitude: lat, longitude: lng, accuracy } = pos.coords;
-        if (accuracy > 150) return;
-        document.getElementById('tracking-coords').innerText = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-        document.getElementById('tracking-accuracy').innerText = `Accuracy: ${accuracy.toFixed(1)}m`;
+        
+        // Dynamic accuracy: Accept first reading, then filter for < 100m
+        if (!_trackingMarker.getLatLng().lat || accuracy < 100) {
+            document.getElementById('tracking-coords').innerText = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+            document.getElementById('tracking-accuracy').innerText = `Accuracy: ${accuracy.toFixed(1)}m`;
 
-        // Update driver's map marker
-        if (_trackingMap && _trackingMarker) {
-            _trackingMap.setView([lat, lng], 15);
-            _trackingMarker.setLatLng([lat, lng]);
-            _trackingMarker.getPopup().setContent(`Your Location<br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`);
-        }
+            // Update driver's map marker
+            if (_trackingMap && _trackingMarker) {
+                _trackingMap.setView([lat, lng], 16); // Zoom in more for "live" feel
+                _trackingMarker.setLatLng([lat, lng]);
+                _trackingMarker.getPopup().setContent(`<b>Driver Location</b><br>Accuracy: ${accuracy.toFixed(1)}m`);
+            }
 
-        // Send to backend + broadcast via socket
-        try {
-            await window.OrdersAPI.updateLocation(_trackingOrderId, { lat, lng });
-        } catch(err) {
-            console.error('Location update failed:', err);
+            // Update Google Maps external button
+            const gmBtn = document.getElementById('btn-open-google-maps');
+            if (gmBtn) {
+                gmBtn.style.display = 'flex';
+                gmBtn.onclick = () => window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+            }
+
+            // Send to backend + broadcast via socket
+            try {
+                await window.OrdersAPI.updateLocation(_trackingOrderId, { lat, lng });
+            } catch(err) {
+                console.error('Location update failed:', err);
+            }
         }
     }, (err) => {
-        showToast('GPS Error: ' + err.message, 'error');
+        let msg = "GPS Error";
+        if (err.code === 1) msg = "Permission Denied. Please enable GPS in browser settings.";
+        else if (err.code === 3) msg = "GPS Timeout. Please ensure you are outdoors.";
+        
+        showToast(msg, 'error');
         stopGpsTracking();
-    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
 }
 
 function stopGpsTracking() { 
@@ -1213,13 +1246,26 @@ async function handleManualLocationSearch() {
 let _cameraStream = null;
 async function startCameraStream() {
     try {
+        // Check permission explicitly for better feedback
+        if (navigator.permissions && navigator.permissions.query) {
+            const status = await navigator.permissions.query({ name: 'camera' });
+            if (status.state === 'denied') {
+                throw new Error("Permission Denied");
+            }
+        }
+
         _cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         const video = document.getElementById('webcam-video');
         video.srcObject = _cameraStream;
         video.style.display = 'block';
         document.getElementById('camera-placeholder').style.display = 'none';
         document.getElementById('btn-capture-photo').classList.remove('hidden');
-    } catch(e) { showToast("Camera access denied", "error"); }
+    } catch(e) { 
+        showToast("Direct Camera Blocked. Using System Camera instead.", "warning");
+        // Fallback: Click the hidden file input that has capture="camera"
+        const fallbackInput = document.getElementById('camera-fallback-input');
+        if (fallbackInput) fallbackInput.click();
+    }
 }
 function stopCameraStream() { 
     if(_cameraStream) {
@@ -1250,6 +1296,35 @@ function capturePhoto() {
     video.style.display = 'none';
     stopCameraStream();
     document.getElementById('submit-proof-submit').disabled = false;
+}
+
+async function handleProofFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.getElementById('capture-canvas');
+            const MAX_WIDTH = 640;
+            const scale = Math.min(1, MAX_WIDTH / img.width);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const data = canvas.toDataURL('image/webp', 0.5);
+            const preview = document.getElementById('proof-preview-img');
+            preview.src = data;
+            preview.style.display = 'block';
+            document.getElementById('webcam-video').style.display = 'none';
+            document.getElementById('camera-placeholder').style.display = 'none';
+            document.getElementById('submit-proof-submit').disabled = false;
+        };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 window.openSubmitProof = (id) => { 
