@@ -21,8 +21,9 @@ const sendOTPEmail = async (toEmail, otp, userName) => {
             user: user,
             pass: pass
         },
-        connectionTimeout: 5000, // 5 seconds
-        timeout: 5000
+        family: 4, // Force IPv4 to avoid ENETUNREACH issues on some cloud networks
+        connectionTimeout: 10000,
+        timeout: 10000
     });
 
     const mailOptions = {
