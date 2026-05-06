@@ -2,20 +2,27 @@ const nodemailer = require('nodemailer');
 
 const sendOTPEmail = async (toEmail, otp, userName) => {
     const user = process.env.EMAIL_USER;
-    const pass = process.env.EMAIL_PASS;
+    const rawPass = process.env.EMAIL_PASS;
 
-    if (!user || !pass) {
+    if (!user || !rawPass) {
         console.error("❌ Email credentials missing in .env file!");
-        throw new Error("Email service is not configured on the server. Please add EMAIL_USER and EMAIL_PASS to environment variables.");
+        throw new Error("Email service is not configured on the server. Please add EMAIL_USER and EMAIL_PASS.");
     }
 
-    // Create transporter inside the function to ensure env vars are loaded
+    // Clean password (remove spaces if user copied it with spaces)
+    const pass = rawPass.replace(/\s+/g, '');
+
     const transporter = nodemailer.createTransport({
         service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
             user: user,
             pass: pass
-        }
+        },
+        connectionTimeout: 5000, // 5 seconds
+        timeout: 5000
     });
 
     const mailOptions = {
