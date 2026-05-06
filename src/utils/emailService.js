@@ -1,40 +1,25 @@
 const nodemailer = require('nodemailer');
 
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 5000,
-    socketTimeout: 15000
-});
-
-// Verify connection on startup
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    transporter.verify((error, success) => {
-        if (error) {
-            console.error('📧 Email Service Error:', error.message);
-        } else {
-            console.log('📧 Email Service is ready to send messages');
-        }
-    });
-}
-
 const sendOTPEmail = async (toEmail, otp, userName) => {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASS;
+
+    if (!user || !pass) {
         console.error("❌ Email credentials missing in .env file!");
-        throw new Error("Email service is not configured on the server.");
+        throw new Error("Email service is not configured on the server. Please add EMAIL_USER and EMAIL_PASS to environment variables.");
     }
 
+    // Create transporter inside the function to ensure env vars are loaded
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: user,
+            pass: pass
+        }
+    });
+
     const mailOptions = {
-        from: `"FlowOps Security" <${process.env.EMAIL_USER}>`,
+        from: `"FlowOps Security" <${user}>`,
         to: toEmail,
         subject: `Your FlowOps OTP Code: ${otp}`,
         html: `
@@ -63,11 +48,18 @@ const sendOTPEmail = async (toEmail, otp, userName) => {
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log('✅ OTP Email sent:', info.messageId);
+        console.log('✅ OTP Email sent successfully to:', toEmail);
         return info;
     } catch (error) {
-        console.error('❌ Failed to send OTP email:', error.message);
-        throw new Error("Failed to send email. Please check server logs.");
+        console.error('❌ Nodemailer Error for', toEmail, ':', error.message);
+        
+        if (error.message.includes('EAUTH')) {
+            throw new Error("Email Authentication failed. Please check your App Password.");
+        } else if (error.message.includes('ECONN')) {
+            throw new Error("Connection to Gmail failed. The server might be blocking the port.");
+        }
+        
+        throw new Error("Failed to send OTP email: " + error.message);
     }
 };
 
