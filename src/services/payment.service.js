@@ -62,8 +62,9 @@ const createCheckoutSession = async (orderId, businessId) => {
             console.log("[Payment] Razorpay link generated:", paymentLink.short_url);
             return paymentLink.short_url;
         } catch (razorError) {
-            console.error("[Payment] Razorpay API Error:", razorError);
-            throw new AppError(`Razorpay Error: ${razorError.description || razorError.message}`, 500);
+            console.error("[Payment] Razorpay API Error Details:", JSON.stringify(razorError));
+            const errorMsg = razorError.description || razorError.message || JSON.stringify(razorError);
+            throw new AppError(`Razorpay Error: ${errorMsg}`, 500);
         }
     } else {
         // --- STRIPE FLOW ---
