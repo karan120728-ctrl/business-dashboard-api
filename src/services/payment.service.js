@@ -37,8 +37,11 @@ const createCheckoutSession = async (orderId, businessId) => {
         }
 
         try {
+            let amountInPaise = Math.round(parseFloat(order.total_amount) * 100);
+            if (amountInPaise < 100) amountInPaise = 100; // Razorpay minimum is 100 paise (1 INR)
+
             const paymentPayload = {
-                amount: Math.round(parseFloat(order.total_amount) * 100), // Ensure it's a number
+                amount: amountInPaise,
                 currency: "INR",
                 accept_partial: false,
                 description: `Order #${order.id} - Logistics Services`,
