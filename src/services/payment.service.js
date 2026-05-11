@@ -1,13 +1,16 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 const Razorpay = require('razorpay');
 const { pool } = require('../db/connection');
 const AppError = require('../utils/AppError');
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Initialize Razorpay conditionally
+let razorpay = null;
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET
+    });
+}
 
 const createCheckoutSession = async (orderId, businessId) => {
     // 1. Fetch order details
@@ -26,6 +29,9 @@ const createCheckoutSession = async (orderId, businessId) => {
     // 2. Determine Gateway
     if (currency === 'INR') {
         // --- RAZORPAY FLOW ---
+        if (!razorpay) {
+            throw new AppError("Razorpay is not configured by the administrator.", 500);
+        }
         const paymentLink = await razorpay.paymentLink.create({
             amount: Math.round(order.total_amount * 100), // In Paise
             currency: "INR",
@@ -52,6 +58,9 @@ const createCheckoutSession = async (orderId, businessId) => {
         return paymentLink.short_url;
     } else {
         // --- STRIPE FLOW ---
+        if (!stripe) {
+            throw new AppError("Stripe is not configured by the administrator.", 500);
+        }
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
