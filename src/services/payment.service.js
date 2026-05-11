@@ -136,10 +136,20 @@ const handleStripeWebhook = async (event) => {
 };
 
 const handleRazorpayWebhook = async (payload) => {
-    // Razorpay sends 'payment_link.paid' event
+    console.log("[Webhook] Full Payload Received:", JSON.stringify(payload));
+    
     if (payload.event === 'payment_link.paid') {
-        const { orderId } = payload.payload.payment_link.entity.notes;
-        await markOrderAsPaid(orderId);
+        const entity = payload.payload.payment_link.entity;
+        const notes = entity.notes || {};
+        const orderId = notes.orderId || notes.order_id; // Try both formats
+        
+        console.log(`[Webhook] Extracted Order ID: ${orderId} from Notes:`, JSON.stringify(notes));
+        
+        if (orderId) {
+            await markOrderAsPaid(orderId);
+        } else {
+            console.error("[Webhook] No Order ID found in Razorpay notes!");
+        }
     }
 };
 

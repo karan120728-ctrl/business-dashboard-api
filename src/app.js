@@ -154,7 +154,14 @@ app.get("/api/seed", async (req, res) => {
     const [busRows] = await pool.query("SELECT id FROM businesses LIMIT 1");
     let defaultBusId = 1;
     if (busRows.length === 0) {
-      const [res] = await pool.query("INSERT INTO businesses (name, business_code) VALUES ('FlowOps Global', 'FLOW-000000')");
+      // Find the first admin to make them the owner
+      const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+      const ownerId = admins.length > 0 ? admins[0].id : null;
+      
+      const [res] = await pool.query(
+        "INSERT INTO businesses (name, business_code, owner_id) VALUES ('FlowOps Global', 'FLOW-000000', ?)", 
+        [ownerId]
+      );
       defaultBusId = res.insertId;
     } else {
       defaultBusId = busRows[0].id;
