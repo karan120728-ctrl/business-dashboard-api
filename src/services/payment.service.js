@@ -56,7 +56,7 @@ const createCheckoutSession = async (orderId, businessId) => {
                     orderId: order.id.toString(),
                     businessId: businessId.toString()
                 },
-                callback_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/dashboard.html?status=success&orderId=${order.id}`,
+                callback_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/index.html?status=success&orderId=${order.id}`,
                 callback_method: "get"
             };
 
@@ -92,8 +92,8 @@ const createCheckoutSession = async (orderId, businessId) => {
                     },
                 ],
                 mode: 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/dashboard.html?status=success&orderId=${order.id}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/dashboard.html?status=cancelled`,
+                success_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/index.html?status=success&orderId=${order.id}`,
+                cancel_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/index.html?status=cancelled`,
                 metadata: {
                     orderId: order.id.toString(),
                     businessId: businessId.toString()
@@ -144,11 +144,53 @@ const handleRazorpayWebhook = async (payload) => {
 };
 
 const markOrderAsPaid = async (orderId) => {
-    await pool.query(
-        "UPDATE orders SET payment_status = 'paid' WHERE id = ?",
-        [orderId]
-    );
-    console.log(`✅ Order #${orderId} marked as PAID via Gateway Webhook`);
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Update Order
+        await connection.query(
+            "UPDATE orders SET payment_status = 'paid' WHERE id = ?",
+            [orderId]
+        );
+
+        // 2. Update Invoice
+        await connection.query(
+            "UPDATE invoices SET status = 'paid', used_at = NOW() WHERE order_id = ?",
+            [orderId]
+        );
+
+        // 3. Fetch Order/Business info for notification
+        const [details] = await connection.query(
+            "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
+            [orderId]
+        );
+
+        if (details.length > 0) {
+            const { business_id, owner_id, total_amount, customer_name } = details[0];
+            const io = require('../app').get('io'); // Get Socket.io instance
+            const notificationService = require('./notification.service');
+
+            // 4. Send Notification to Admin
+            if (owner_id) {
+                await notificationService.createNotification(
+                    io, 
+                    business_id, 
+                    owner_id, 
+                    "Payment Received! 💰", 
+                    `Payment of ₹${total_amount} received from ${customer_name} for Order #${orderId}.`
+                );
+            }
+        }
+
+        await connection.commit();
+        console.log(`✅ Order #${orderId} and Invoice fully marked as PAID and Admin notified.`);
+    } catch (error) {
+        await connection.rollback();
+        console.error(`❌ Error marking order #${orderId} as paid:`, error);
+    } finally {
+        connection.release();
+    }
 };
 
 module.exports = {
