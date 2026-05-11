@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const paymentService = require('../services/payment.service');
 const { protect } = require('../middlewares/auth.middleware');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 const crypto = require('crypto');
 
 // 1. Create Checkout Session (Protected)
