@@ -739,6 +739,11 @@ async function loadOrders() {
                 actions += ` <button class="btn btn-primary btn-sm" onclick="sendPaymentEmail(${o.id})" title="Send via Email"><i class="fa-solid fa-envelope"></i></button>`;
             }
 
+            // Pay Now button for customers
+            if (currentUser.role === 'customer' && (o.payment_status === 'unpaid' || o.payment_status === 'overdue')) {
+                actions += ` <button class="btn btn-success btn-sm" onclick="payOrder(${o.id})" style="background:var(--primary); border-color:var(--primary);"><i class="fa-solid fa-credit-card"></i> Pay Now</button>`;
+            }
+
             let pBadgeClass = 'warning';
             if (o.payment_status === 'paid') pBadgeClass = 'success';
             if (o.payment_status === 'overdue') pBadgeClass = 'danger';
@@ -813,6 +818,20 @@ async function forceUpdateStatus(id, status) {
         loadOrders(); 
     } catch(e) { showToast(e.message || "Failed to update status", "error"); }
 }
+
+window.payOrder = async (id) => {
+    try {
+        showToast("Opening Secure Payment...", "info");
+        const res = await window.OrdersAPI.createPaymentSession(id);
+        if (res.url) {
+            window.location.href = res.url;
+        } else {
+            throw new Error("Failed to generate payment link");
+        }
+    } catch(e) {
+        showToast(e.message || "Payment gateway unavailable", "error");
+    }
+};
 
 /* ================= PAYMENTS ================= */
 async function loadPayments() {

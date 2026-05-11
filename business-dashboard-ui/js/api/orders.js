@@ -18,6 +18,7 @@ const OrdersAPI = {
         if (!response.ok) throw new Error(data.message || 'Upload failed');
         return data;
     },
-    submitProof: (id, data) => API.post(`/orders/${id}/submit-proof`, data)
+    submitProof: (id, data) => API.post(`/orders/${id}/submit-proof`, data),
+    createPaymentSession: (id) => API.post(`/payments/create-session/${id}`)
 };
 window.OrdersAPI = OrdersAPI;

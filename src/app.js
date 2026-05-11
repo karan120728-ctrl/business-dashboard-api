@@ -218,6 +218,14 @@ app.use("/api/invoices", invoiceRoute);
 const dashboardRoute = require("./routes/dashboard.route");
 app.use("/api", dashboardRoute);
 
+const paymentRoute = require("./routes/payment.routes.js");
+// Special handling for Webhooks (need raw body for signature verification)
+app.use("/api/payments/webhook/stripe", express.raw({ type: "application/json" }));
+app.use("/api/payments/webhook/razorpay", express.json({
+  verify: (req, res, buf) => { req.rawBody = buf; } // Store raw body for Razorpay signature
+}));
+app.use("/api/payments", paymentRoute);
+
 // start background jobs
 const { startCronJobs } = require("./utils/cronJobs");
 startCronJobs();
