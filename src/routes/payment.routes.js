@@ -46,13 +46,14 @@ router.post('/webhook/razorpay', async (req, res) => {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'flowops_secret_2026';
     const signature = req.headers['x-razorpay-signature'];
     
-    // Verify signature
+    // Verify signature using RAW body
     const expectedSignature = crypto
         .createHmac('sha256', secret)
-        .update(JSON.stringify(req.body))
+        .update(req.rawBody)
         .digest('hex');
 
     if (signature !== expectedSignature) {
+        console.error("[Payment] Razorpay Invalid Signature detected!");
         return res.status(400).send('Invalid Signature');
     }
 

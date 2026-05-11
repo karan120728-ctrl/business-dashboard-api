@@ -230,6 +230,16 @@ app.use("/api/payments", paymentRoute);
 const { startCronJobs } = require("./utils/cronJobs");
 startCronJobs();
 
+// Global Error Handler (JSON)
+app.use((err, req, res, next) => {
+  console.error("[Server Error]", err);
+  const status = err.statusCode || 500;
+  res.status(status).json({
+    status: 'error',
+    message: err.message || 'Internal Server Error'
+  });
+});
+
 // start server
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
