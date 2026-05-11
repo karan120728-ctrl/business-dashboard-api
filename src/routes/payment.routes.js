@@ -18,6 +18,16 @@ router.post('/create-session/:orderId', protect, async (req, res, next) => {
     }
 });
 
+// 2. Create Session from Public Token (Guest Checkout)
+router.post('/pay-invoice/:token', async (req, res, next) => {
+    try {
+        const checkoutUrl = await paymentService.createSessionFromToken(req.params.token);
+        res.json({ status: 'success', url: checkoutUrl });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // 2. Stripe Webhook
 router.post('/webhook/stripe', async (req, res) => {
     const sig = req.headers['stripe-signature'];

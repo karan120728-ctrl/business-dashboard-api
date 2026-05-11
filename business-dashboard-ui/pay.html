@@ -225,30 +225,23 @@
                 loadingState.style.display = 'none';
                 invoiceContent.style.display = 'block';
 
-                // Handle payment simulation
+                // Handle real payment gateway redirect
                 payBtn.addEventListener('click', async () => {
                     payBtn.disabled = true;
-                    payBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Processing...';
+                    payBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Opening Secure Payment...';
                     
                     try {
-                        const payRes = await fetch(`${window.API_URL}/invoices/pay/${token}`, {
+                        // Call the new real payment endpoint
+                        const payRes = await fetch(`${window.API_URL}/payments/pay-invoice/${token}`, {
                             method: 'POST'
                         });
                         const payData = await payRes.json();
                         
-                        if (payRes.ok) {
-                            showToast('Payment successful!', 'success');
-                            statusBadge.textContent = 'paid';
-                            statusBadge.className = 'status-badge status-paid';
-                            payBtn.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> Payment Successful';
-                            payBtn.style.background = 'var(--success)';
-                            
-                            // Let the user admire the success before reloading or leaving
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 2000);
+                        if (payRes.ok && payData.url) {
+                            // Redirect to Razorpay/Stripe
+                            window.location.href = payData.url;
                         } else {
-                            throw new Error(payData.message || 'Payment failed');
+                            throw new Error(payData.message || 'Payment gateway unavailable');
                         }
                     } catch(e) {
                         showToast(e.message, 'error');

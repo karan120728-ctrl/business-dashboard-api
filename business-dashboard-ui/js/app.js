@@ -821,14 +821,19 @@ async function forceUpdateStatus(id, status) {
 
 window.payOrder = async (id) => {
     try {
+        console.log(`[FlowOps] Initiating payment for Order #${id}`);
         showToast("Opening Secure Payment...", "info");
+        
         const res = await window.OrdersAPI.createPaymentSession(id);
-        if (res.url) {
-            window.location.href = res.url;
+        
+        if (res.status === 'success' && res.url) {
+            // Using replace for mobile to prevent back-button loops
+            window.location.assign(res.url);
         } else {
-            throw new Error("Failed to generate payment link");
+            throw new Error(res.message || "Failed to generate payment link");
         }
     } catch(e) {
+        console.error("[FlowOps] Payment Error:", e);
         showToast(e.message || "Payment gateway unavailable", "error");
     }
 };

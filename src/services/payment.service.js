@@ -13,9 +13,9 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
 }
 
 const createCheckoutSession = async (orderId, businessId) => {
-    // 1. Fetch order details
+    // 1. Fetch order details correctly (join with customers table)
     const [orders] = await pool.query(
-        "SELECT o.*, p.name as product_name, u.email as customer_email, u.name as customer_name FROM orders o JOIN products p ON o.product_id = p.id JOIN users u ON o.customer_id = u.id WHERE o.id = ? AND o.business_id = ?",
+        "SELECT o.*, c.name as customer_name, c.email as customer_email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ? AND o.business_id = ?",
         [orderId, businessId]
     );
 
@@ -36,7 +36,7 @@ const createCheckoutSession = async (orderId, businessId) => {
             amount: Math.round(order.total_amount * 100), // In Paise
             currency: "INR",
             accept_partial: false,
-            description: `Order #${order.id} - ${order.product_name}`,
+            description: `Order #${order.id} - Logistics Services`,
             customer: {
                 name: order.customer_name,
                 email: order.customer_email,
@@ -68,7 +68,7 @@ const createCheckoutSession = async (orderId, businessId) => {
                     price_data: {
                         currency: currency.toLowerCase(),
                         product_data: {
-                            name: `Order #${order.id} - ${order.product_name}`,
+                            name: `Order #${order.id} - Logistics Services`,
                         },
                         unit_amount: Math.round(order.total_amount * 100),
                     },
@@ -86,6 +86,22 @@ const createCheckoutSession = async (orderId, businessId) => {
 
         return session.url;
     }
+};
+
+const createSessionFromToken = async (token) => {
+    // 1. Find invoice by token
+    const [invoices] = await pool.query(
+        "SELECT i.*, b.id as business_id FROM invoices i JOIN businesses b ON i.business_id = b.id WHERE i.payment_token = ? AND i.status != 'paid'",
+        [token]
+    );
+
+    if (invoices.length === 0) {
+        throw new AppError("Invalid or already paid invoice token", 400);
+    }
+
+    const invoice = invoices[0];
+    // Re-use the existing checkout logic
+    return await createCheckoutSession(invoice.order_id, invoice.business_id);
 };
 
 const handleStripeWebhook = async (event) => {
