@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const paymentService = require('../services/payment.service');
-const { protect } = require('../middleware/auth');
+const { protect } = require('../middlewares/auth.middleware');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const crypto = require('crypto');
 
