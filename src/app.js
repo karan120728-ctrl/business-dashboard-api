@@ -17,18 +17,24 @@ const io = new Server(server, {
   }
 });
 
+// 1. Webhook Middlewares (MUST be before global express.json)
+app.use("/api/payments/webhook/stripe", express.raw({ type: "application/json" }));
+app.use("/api/payments/webhook/razorpay", express.json({
+  verify: (req, res, buf) => { req.rawBody = buf; }
+}));
+
 const PORT = process.env.PORT || 3000;
 
-// middleware - Increased limits for proof image uploads
+// 2. Global middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 app.use((req, res, next) => {
   const allowedOrigins = ['https://business-dashboard-api.vercel.app', 'http://localhost:55188', 'http://localhost:60755', 'http://localhost:3000', 'http://127.0.0.1:5500'];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
       res.header("Access-Control-Allow-Origin", origin);
   } else {
-      // Fallback for Vercel if origin header is missing in some cases
       res.header("Access-Control-Allow-Origin", "https://business-dashboard-api.vercel.app");
   }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
@@ -219,11 +225,6 @@ const dashboardRoute = require("./routes/dashboard.route");
 app.use("/api", dashboardRoute);
 
 const paymentRoute = require("./routes/payment.routes.js");
-// Special handling for Webhooks (need raw body for signature verification)
-app.use("/api/payments/webhook/stripe", express.raw({ type: "application/json" }));
-app.use("/api/payments/webhook/razorpay", express.json({
-  verify: (req, res, buf) => { req.rawBody = buf; } // Store raw body for Razorpay signature
-}));
 app.use("/api/payments", paymentRoute);
 
 // start background jobs
