@@ -24,67 +24,86 @@ const createCheckoutSession = async (orderId, businessId) => {
     }
 
     const order = orders[0];
-    const currency = order.currency || 'INR'; // Default to INR for local context
+    const currency = order.currency || 'INR'; 
     
+    console.log(`[Payment] Creating session for Order #${orderId}, Currency: ${currency}, Amount: ${order.total_amount}`);
+
     // 2. Determine Gateway
     if (currency === 'INR') {
         // --- RAZORPAY FLOW ---
         if (!razorpay) {
-            throw new AppError("Razorpay is not configured by the administrator.", 500);
+            console.error("[Payment] Razorpay keys missing in environment variables!");
+            throw new AppError("Razorpay is not configured on this server.", 500);
         }
-        const paymentLink = await razorpay.paymentLink.create({
-            amount: Math.round(order.total_amount * 100), // In Paise
-            currency: "INR",
-            accept_partial: false,
-            description: `Order #${order.id} - Logistics Services`,
-            customer: {
-                name: order.customer_name,
-                email: order.customer_email,
-                contact: "" // Add phone if available
-            },
-            notify: {
-                sms: false,
-                email: true
-            },
-            reminder_enable: true,
-            notes: {
-                orderId: order.id.toString(),
-                businessId: businessId.toString()
-            },
-            callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/dashboard.html?status=success&orderId=${order.id}`,
-            callback_method: "get"
-        });
 
-        return paymentLink.short_url;
+        try {
+            const paymentPayload = {
+                amount: Math.round(parseFloat(order.total_amount) * 100), // Ensure it's a number
+                currency: "INR",
+                accept_partial: false,
+                description: `Order #${order.id} - Logistics Services`,
+                customer: {
+                    name: order.customer_name || "Customer",
+                    email: order.customer_email || "billing@flowops.com",
+                    contact: "" 
+                },
+                notify: { sms: false, email: true },
+                reminder_enable: true,
+                notes: {
+                    orderId: order.id.toString(),
+                    businessId: businessId.toString()
+                },
+                callback_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/dashboard.html?status=success&orderId=${order.id}`,
+                callback_method: "get"
+            };
+
+            console.log("[Payment] Sending payload to Razorpay:", JSON.stringify(paymentPayload));
+            const paymentLink = await razorpay.paymentLink.create(paymentPayload);
+            console.log("[Payment] Razorpay link generated:", paymentLink.short_url);
+            return paymentLink.short_url;
+        } catch (razorError) {
+            console.error("[Payment] Razorpay API Error:", razorError);
+            throw new AppError(`Razorpay Error: ${razorError.description || razorError.message}`, 500);
+        }
     } else {
         // --- STRIPE FLOW ---
         if (!stripe) {
-            throw new AppError("Stripe is not configured by the administrator.", 500);
+            console.error("[Payment] Stripe key missing in environment variables!");
+            throw new AppError("Stripe is not configured on this server.", 500);
         }
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price_data: {
-                        currency: currency.toLowerCase(),
-                        product_data: {
-                            name: `Order #${order.id} - Logistics Services`,
-                        },
-                        unit_amount: Math.round(order.total_amount * 100),
-                    },
-                    quantity: 1,
-                },
-            ],
-            mode: 'payment',
-            success_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/dashboard.html?status=success&orderId=${order.id}`,
-            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/dashboard.html?status=cancelled`,
-            metadata: {
-                orderId: order.id.toString(),
-                businessId: businessId.toString()
-            }
-        });
 
-        return session.url;
+        try {
+            const sessionPayload = {
+                payment_method_types: ['card'],
+                line_items: [
+                    {
+                        price_data: {
+                            currency: currency.toLowerCase(),
+                            product_data: {
+                                name: `Order #${order.id} - Logistics Services`,
+                            },
+                            unit_amount: Math.round(parseFloat(order.total_amount) * 100),
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                success_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/dashboard.html?status=success&orderId=${order.id}`,
+                cancel_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/dashboard.html?status=cancelled`,
+                metadata: {
+                    orderId: order.id.toString(),
+                    businessId: businessId.toString()
+                }
+            };
+
+            console.log("[Payment] Creating Stripe Session with payload:", JSON.stringify(sessionPayload));
+            const session = await stripe.checkout.sessions.create(sessionPayload);
+            console.log("[Payment] Stripe Session generated:", session.url);
+            return session.url;
+        } catch (stripeError) {
+            console.error("[Payment] Stripe API Error:", stripeError);
+            throw new AppError(`Stripe Error: ${stripeError.message}`, 500);
+        }
     }
 };
 

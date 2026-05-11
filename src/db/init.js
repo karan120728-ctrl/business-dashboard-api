@@ -93,6 +93,18 @@ const initDB = async () => {
         FOREIGN KEY (created_by) REFERENCES users(id)
       )
     `);
+    
+    // 5.1 Order Items Table (NEW)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id)
+      )
+    `);
 
     // 6. Notifications Table (Isolated)
     await connection.query(`
