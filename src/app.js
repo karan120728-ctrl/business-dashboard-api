@@ -195,6 +195,8 @@ app.get("/api/seed", async (req, res) => {
         payment_token VARCHAR(255) NOT NULL UNIQUE,
         token_expires_at DATETIME NOT NULL,
         used_at DATETIME NULL,
+        paid_at DATETIME NULL,
+        razorpay_payment_id VARCHAR(255) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,

@@ -136,12 +136,12 @@ const handleStripeWebhook = async (event) => {
 };
 
 const handleRazorpayWebhook = async (req, res) => {
-    console.log("[Webhook] Official Validation Starting...");
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'flowops_secret_2026';
     const signature = req.headers['x-razorpay-signature'];
-    
-    // Official Razorpay SDK Validation using the RAW body string
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'flowops_secret_2026';
     const RazorpaySDK = require('razorpay');
+
+    console.log("[Audit] Webhook Received. Starting Validation...");
+    
     const isValid = RazorpaySDK.validateWebhookSignature(
         req.rawBody.toString(), 
         signature, 
@@ -149,55 +149,86 @@ const handleRazorpayWebhook = async (req, res) => {
     );
 
     if (!isValid) {
-        console.error("[Webhook] Razorpay Invalid Signature detected by SDK!");
+        console.error("[Audit] FAILED: Invalid Razorpay Signature.");
         return res.status(400).send('Invalid Signature');
     }
 
-    console.log("[Webhook] Signature Verified! Processing payload...");
+    console.log("[Audit] Signature Verified. Processing payload...");
     const payload = req.body;
     let orderId = null;
+    let paymentId = null;
 
-    // Handle DIFFERENT Razorpay event types
-    if (payload.event === 'payment_link.paid') {
-        const notes = payload.payload.payment_link.entity.notes || {};
-        orderId = notes.orderId || notes.order_id;
-    } else if (payload.event === 'payment.captured') {
-        const notes = payload.payload.payment.entity.notes || {};
-        orderId = notes.orderId || notes.order_id;
-    }
+    // Step 1 & 3: Structured Payload Inspection
+    try {
+        if (payload.event === 'payment_link.paid') {
+            const entity = payload.payload.payment_link.entity;
+            orderId = entity.notes.orderId || entity.notes.order_id;
+            paymentId = payload.payload.payment.entity.id;
+        } else if (payload.event === 'payment.captured') {
+            const entity = payload.payload.payment.entity;
+            orderId = entity.notes.orderId || entity.notes.order_id;
+            paymentId = entity.id;
+        }
 
-    console.log(`[Webhook] Event: ${payload.event}, Extracted Order ID: ${orderId}`);
-    
-    if (orderId) {
-        await markOrderAsPaid(orderId);
-    } else {
-        console.warn("[Webhook] No Order ID found in this event payload.");
+        console.log(`[Audit] Event: ${payload.event}, Extracted OrderID: ${orderId}, PaymentID: ${paymentId}`);
+        
+        if (orderId) {
+            await markOrderAsPaid(orderId, paymentId);
+        } else {
+            console.error("[Audit] FAILED: No Order ID found in Razorpay notes. Payload:", JSON.stringify(payload.payload));
+        }
+    } catch (e) {
+        console.error("[Audit] CRITICAL Webhook Parse Error:", e.message);
     }
 
     return res.status(200).send('OK');
 };
 
-const markOrderAsPaid = async (orderId) => {
+const markOrderAsPaid = async (orderId, paymentId = null) => {
+    console.log(`[Audit] Starting Database Update for Order #${orderId}...`);
     const connection = await pool.getConnection();
+    
     try {
         await connection.beginTransaction();
 
-        // 1. Update Order
-        await connection.query(
-            "UPDATE orders SET payment_status = 'paid' WHERE id = ?",
-            [orderId]
+        // Step 4: Verify Invoice Lookup
+        const [invoices] = await connection.query(
+            "SELECT id, status FROM invoices WHERE order_id = ?", [orderId]
         );
+        
+        if (invoices.length === 0) {
+            console.error(`[Audit] FAILED: No matching invoice found for Order #${orderId}`);
+            await connection.rollback();
+            return;
+        }
 
-        // 2. Update Invoice
-        await connection.query(
-            "UPDATE invoices SET status = 'paid', used_at = NOW() WHERE order_id = ?",
-            [orderId]
+        if (invoices[0].status === 'paid') {
+            console.log(`[Audit] SKIP: Order #${orderId} is already marked as PAID.`);
+            await connection.rollback();
+            return;
+        }
+
+        // Step 5: Execute and Log Affected Rows
+        const [orderResult] = await connection.query(
+            "UPDATE orders SET payment_status = 'paid' WHERE id = ?", [orderId]
         );
+        console.log(`[Audit] Orders Update: ${orderResult.affectedRows} row(s) affected.`);
 
+        const [invoiceResult] = await connection.query(
+            "UPDATE invoices SET status = 'paid', paid_at = NOW(), razorpay_payment_id = ?, used_at = NOW() WHERE order_id = ?",
+            [paymentId, orderId]
+        );
+        console.log(`[Audit] Invoices Update: ${invoiceResult.affectedRows} row(s) affected.`);
+
+        // Step 6: Commit Transaction
         await connection.commit();
-        console.log(`✅ Order #${orderId} and Invoice fully marked as PAID.`);
+        console.log(`[Audit] SUCCESS: Transaction committed for Order #${orderId}`);
 
-        // 3. Send Notification (Decoupled to prevent status update failure)
+        // Step 7: Post-Update Verification
+        const [finalOrder] = await connection.query("SELECT payment_status FROM orders WHERE id = ?", [orderId]);
+        console.log(`[Audit] Final Database State for Order #${orderId}: ${finalOrder[0].payment_status}`);
+
+        // Notification (Decoupled)
         try {
             const [details] = await connection.query(
                 "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
@@ -212,21 +243,16 @@ const markOrderAsPaid = async (orderId) => {
 
                 if (owner_id && io) {
                     await notificationService.createNotification(
-                        io, 
-                        business_id, 
-                        owner_id, 
-                        "Payment Received! 💰", 
+                        io, business_id, owner_id, "Payment Received! 💰", 
                         `Payment of ₹${total_amount} received from ${customer_name} for Order #${orderId}.`
                     );
                 }
             }
-        } catch (notifErr) {
-            console.error("[Webhook] Notification failed but status was updated:", notifErr.message);
-        }
+        } catch (nErr) { console.error("[Audit] Notification Error:", nErr.message); }
 
     } catch (error) {
         await connection.rollback();
-        console.error(`❌ Error marking order #${orderId} as paid:`, error);
+        console.error(`[Audit] CRITICAL FAILURE for Order #${orderId}:`, error.message);
     } finally {
         connection.release();
     }
