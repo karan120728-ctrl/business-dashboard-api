@@ -43,27 +43,7 @@ router.post('/webhook/stripe', async (req, res) => {
 
 // 3. Razorpay Webhook
 router.post('/webhook/razorpay', async (req, res) => {
-    console.log("[Webhook] Razorpay signal received!");
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'flowops_secret_2026';
-    const signature = req.headers['x-razorpay-signature'];
-    
-    // Verify signature using RAW body
-    const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(req.rawBody)
-        .digest('hex');
-
-    console.log("[Webhook] Expected Signature:", expectedSignature);
-    console.log("[Webhook] Received Signature:", signature);
-
-    if (signature !== expectedSignature) {
-        console.error("[Webhook] Razorpay Invalid Signature detected!");
-        return res.status(400).send('Invalid Signature');
-    }
-
-    console.log("[Webhook] Signature Verified! Processing payload...");
-    await paymentService.handleRazorpayWebhook(req.body);
-    res.json({ status: 'ok' });
+    await paymentService.handleRazorpayWebhook(req, res);
 });
 
 module.exports = router;

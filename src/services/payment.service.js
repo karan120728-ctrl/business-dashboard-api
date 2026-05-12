@@ -135,8 +135,26 @@ const handleStripeWebhook = async (event) => {
     }
 };
 
-const handleRazorpayWebhook = async (payload) => {
-    console.log("[Webhook] Full Payload Received:", JSON.stringify(payload));
+const handleRazorpayWebhook = async (req, res) => {
+    console.log("[Webhook] Official Validation Starting...");
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'flowops_secret_2026';
+    const signature = req.headers['x-razorpay-signature'];
+    
+    // Official Razorpay SDK Validation using the RAW body string
+    const RazorpaySDK = require('razorpay');
+    const isValid = RazorpaySDK.validateWebhookSignature(
+        req.rawBody.toString(), 
+        signature, 
+        secret
+    );
+
+    if (!isValid) {
+        console.error("[Webhook] Razorpay Invalid Signature detected by SDK!");
+        return res.status(400).send('Invalid Signature');
+    }
+
+    console.log("[Webhook] Signature Verified! Processing payload...");
+    const payload = req.body;
     
     if (payload.event === 'payment_link.paid') {
         const entity = payload.payload.payment_link.entity;
@@ -151,6 +169,7 @@ const handleRazorpayWebhook = async (payload) => {
             console.error("[Webhook] No Order ID found in Razorpay notes!");
         }
     }
+    return res.status(200).send('OK');
 };
 
 const markOrderAsPaid = async (orderId) => {
@@ -170,31 +189,36 @@ const markOrderAsPaid = async (orderId) => {
             [orderId]
         );
 
-        // 3. Fetch Order/Business info for notification
-        const [details] = await connection.query(
-            "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
-            [orderId]
-        );
+        await connection.commit();
+        console.log(`✅ Order #${orderId} and Invoice fully marked as PAID.`);
 
-        if (details.length > 0) {
-            const { business_id, owner_id, total_amount, customer_name } = details[0];
-            const io = require('../app').get('io'); // Get Socket.io instance
-            const notificationService = require('./notification.service');
+        // 3. Send Notification (Decoupled to prevent status update failure)
+        try {
+            const [details] = await connection.query(
+                "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
+                [orderId]
+            );
 
-            // 4. Send Notification to Admin
-            if (owner_id) {
-                await notificationService.createNotification(
-                    io, 
-                    business_id, 
-                    owner_id, 
-                    "Payment Received! 💰", 
-                    `Payment of ₹${total_amount} received from ${customer_name} for Order #${orderId}.`
-                );
+            if (details.length > 0) {
+                const { business_id, owner_id, total_amount, customer_name } = details[0];
+                const app = require('../app');
+                const io = typeof app.get === 'function' ? app.get('io') : null;
+                const notificationService = require('./notification.service');
+
+                if (owner_id && io) {
+                    await notificationService.createNotification(
+                        io, 
+                        business_id, 
+                        owner_id, 
+                        "Payment Received! 💰", 
+                        `Payment of ₹${total_amount} received from ${customer_name} for Order #${orderId}.`
+                    );
+                }
             }
+        } catch (notifErr) {
+            console.error("[Webhook] Notification failed but status was updated:", notifErr.message);
         }
 
-        await connection.commit();
-        console.log(`✅ Order #${orderId} and Invoice fully marked as PAID and Admin notified.`);
     } catch (error) {
         await connection.rollback();
         console.error(`❌ Error marking order #${orderId} as paid:`, error);
