@@ -167,16 +167,22 @@ const handleRazorpayWebhook = async (req, res) => {
     let orderId = null;
     let paymentId = null;
 
-    // Step 1 & 3: HARDENED Payload Inspection
+    // Step 1 & 3: SUPER-HARDENED Payload Inspection
     try {
         if (payload.event === 'payment_link.paid') {
             const pl = payload.payload.payment_link.entity;
-            const p = payload.payload.payment.entity;
-            orderId = pl.notes.orderId || pl.notes.order_id || p.notes.orderId;
-            paymentId = p.id;
+            const p = payload.payload.payment ? payload.payload.payment.entity : null;
+            
+            // Try EVERY possible pocket for the Order ID
+            orderId = pl.notes?.orderId || pl.notes?.order_id || 
+                      (p ? (p.notes?.orderId || p.notes?.order_id) : null) ||
+                      pl.description?.match(/Order #(\d+)/)?.[1];
+            
+            paymentId = p ? p.id : pl.payment_id;
         } else if (payload.event === 'payment.captured') {
             const p = payload.payload.payment.entity;
-            orderId = p.notes.orderId || p.notes.order_id;
+            orderId = p.notes?.orderId || p.notes?.order_id || 
+                      p.description?.match(/Order #(\d+)/)?.[1];
             paymentId = p.id;
         }
 
@@ -273,5 +279,6 @@ const markOrderAsPaid = async (orderId, paymentId = null) => {
 module.exports = {
     createCheckoutSession,
     handleStripeWebhook,
-    handleRazorpayWebhook
+    handleRazorpayWebhook,
+    markOrderAsPaid
 };

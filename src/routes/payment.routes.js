@@ -41,12 +41,14 @@ router.post('/webhook/stripe', async (req, res) => {
     res.json({ received: true });
 });
 
-// 3. Razorpay Webhook
+// 4. Razorpay Webhook
 router.post('/webhook/razorpay', async (req, res) => {
     await paymentService.handleRazorpayWebhook(req, res);
 });
 
-// 4. Secret Manual Sync (For Testing/Fail-safe)
+module.exports = router;
+
+// 5. Secret Manual Sync (For Testing/Fail-safe)
 router.get('/force-sync/:orderId', async (req, res) => {
     const secret = req.query.secret;
     if (secret !== 'flowops_sync_2026') return res.status(403).send('Forbidden');
@@ -56,6 +58,19 @@ router.get('/force-sync/:orderId', async (req, res) => {
         res.send(`✅ Order #${req.params.orderId} forced to PAID successfully!`);
     } catch (e) {
         res.status(500).send(`❌ Sync Failed: ${e.message}`);
+    }
+});
+
+// 6. Audit Viewer (For Debugging)
+router.get('/audit-view', async (req, res) => {
+    const secret = req.query.secret;
+    if (secret !== 'flowops_sync_2026') return res.status(403).send('Forbidden');
+    
+    try {
+        const [logs] = await pool.query("SELECT * FROM payment_audit_logs ORDER BY created_at DESC LIMIT 10");
+        res.json(logs);
+    } catch (e) {
+        res.status(500).send(`❌ Audit View Failed: ${e.message}`);
     }
 });
 
