@@ -155,20 +155,25 @@ const handleRazorpayWebhook = async (req, res) => {
 
     console.log("[Webhook] Signature Verified! Processing payload...");
     const payload = req.body;
-    
+    let orderId = null;
+
+    // Handle DIFFERENT Razorpay event types
     if (payload.event === 'payment_link.paid') {
-        const entity = payload.payload.payment_link.entity;
-        const notes = entity.notes || {};
-        const orderId = notes.orderId || notes.order_id; // Try both formats
-        
-        console.log(`[Webhook] Extracted Order ID: ${orderId} from Notes:`, JSON.stringify(notes));
-        
-        if (orderId) {
-            await markOrderAsPaid(orderId);
-        } else {
-            console.error("[Webhook] No Order ID found in Razorpay notes!");
-        }
+        const notes = payload.payload.payment_link.entity.notes || {};
+        orderId = notes.orderId || notes.order_id;
+    } else if (payload.event === 'payment.captured') {
+        const notes = payload.payload.payment.entity.notes || {};
+        orderId = notes.orderId || notes.order_id;
     }
+
+    console.log(`[Webhook] Event: ${payload.event}, Extracted Order ID: ${orderId}`);
+    
+    if (orderId) {
+        await markOrderAsPaid(orderId);
+    } else {
+        console.warn("[Webhook] No Order ID found in this event payload.");
+    }
+
     return res.status(200).send('OK');
 };
 
