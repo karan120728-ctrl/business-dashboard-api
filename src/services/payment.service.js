@@ -148,34 +148,46 @@ const handleRazorpayWebhook = async (req, res) => {
         secret
     );
 
+    const payload = req.body;
+
+    // Log the attempt to the database for debugging
+    try {
+        await pool.query(
+            "INSERT INTO payment_audit_logs (event_type, payload, status) VALUES (?, ?, ?)",
+            [payload.event, JSON.stringify(payload), isValid ? 'verified' : 'invalid_signature']
+        );
+    } catch (e) { console.error("Failed to log audit:", e.message); }
+
     if (!isValid) {
         console.error("[Audit] FAILED: Invalid Razorpay Signature.");
         return res.status(400).send('Invalid Signature');
     }
 
     console.log("[Audit] Signature Verified. Processing payload...");
-    const payload = req.body;
     let orderId = null;
     let paymentId = null;
 
-    // Step 1 & 3: Structured Payload Inspection
+    // Step 1 & 3: HARDENED Payload Inspection
     try {
         if (payload.event === 'payment_link.paid') {
-            const entity = payload.payload.payment_link.entity;
-            orderId = entity.notes.orderId || entity.notes.order_id;
-            paymentId = payload.payload.payment.entity.id;
+            const pl = payload.payload.payment_link.entity;
+            const p = payload.payload.payment.entity;
+            orderId = pl.notes.orderId || pl.notes.order_id || p.notes.orderId;
+            paymentId = p.id;
         } else if (payload.event === 'payment.captured') {
-            const entity = payload.payload.payment.entity;
-            orderId = entity.notes.orderId || entity.notes.order_id;
-            paymentId = entity.id;
+            const p = payload.payload.payment.entity;
+            orderId = p.notes.orderId || p.notes.order_id;
+            paymentId = p.id;
         }
 
         console.log(`[Audit] Event: ${payload.event}, Extracted OrderID: ${orderId}, PaymentID: ${paymentId}`);
         
         if (orderId) {
+            // Update the audit log with the order ID we found
+            await pool.query("UPDATE payment_audit_logs SET order_id = ? WHERE id = (SELECT LAST_INSERT_ID())", [orderId]);
             await markOrderAsPaid(orderId, paymentId);
         } else {
-            console.error("[Audit] FAILED: No Order ID found in Razorpay notes. Payload:", JSON.stringify(payload.payload));
+            console.error("[Audit] FAILED: No Order ID found. Payload keys:", Object.keys(payload.payload));
         }
     } catch (e) {
         console.error("[Audit] CRITICAL Webhook Parse Error:", e.message);

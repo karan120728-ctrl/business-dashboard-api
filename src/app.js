@@ -205,6 +205,18 @@ app.get("/api/seed", async (req, res) => {
       )
     `);
 
+    // 10. Create Payment Audit Logs (For debugging)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_audit_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        event_type VARCHAR(255),
+        payload LONGTEXT,
+        order_id VARCHAR(50),
+        status VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     res.json({ message: "✅ NUCLEAR FIX APPLIED: All tables isolated, seeded, and invoices created!" });
   } catch (e) {
     res.status(500).json({ message: "Seed failed: " + e.message });
