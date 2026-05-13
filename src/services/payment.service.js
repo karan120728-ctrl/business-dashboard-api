@@ -63,13 +63,18 @@ const createCheckoutSession = async (orderId, businessId) => {
             console.log("[Payment] Sending payload to Razorpay:", JSON.stringify(paymentPayload));
             const paymentLink = await razorpay.paymentLink.create(paymentPayload);
             
-            // PERMANENT MAPPING: Store the official Razorpay Order ID in our Invoice
-            await pool.query(
-                "UPDATE invoices SET razorpay_order_id = ? WHERE order_id = ?",
-                [paymentLink.order_id, order.id]
-            );
+            // PERMANENT MAPPING (With Fail-Safe)
+            try {
+                await pool.query(
+                    "UPDATE invoices SET razorpay_order_id = ? WHERE order_id = ?",
+                    [paymentLink.order_id, order.id]
+                );
+                console.log("[Payment] Steel Link established for Order:", order.id);
+            } catch (mappingError) {
+                console.warn("[Payment] Mapping failed (Did you run the Seed URL?), falling back to Notes-only mode.");
+            }
 
-            console.log("[Payment] Razorpay link generated and mapped:", paymentLink.short_url, "Order ID:", paymentLink.order_id);
+            console.log("[Payment] Razorpay link generated:", paymentLink.short_url);
             return paymentLink.short_url;
         } catch (razorError) {
             console.error("[Payment] Razorpay API Error Details:", JSON.stringify(razorError));
