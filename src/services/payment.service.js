@@ -143,9 +143,23 @@ const handleStripeWebhook = async (event) => {
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const { orderId } = session.metadata;
-        await markOrderAsPaid(orderId);
+        
+        // Find invoice by order ID
+        const [invoices] = await pool.query(
+            "SELECT id FROM invoices WHERE order_id = ?", 
+            [orderId]
+        );
+        
+        if (invoices.length > 0) {
+            await invoiceService.markInvoiceAsPaid(invoices[0].id, session.payment_intent);
+            console.log(`[Stripe] SUCCESS: Order #${orderId} marked as PAID.`);
+        } else {
+            console.error(`[Stripe] FAILED: No local invoice found for Order ID: ${orderId}`);
+        }
     }
 };
+
+const invoiceService = require('./invoice.service');
 
 const handleRazorpayWebhook = async (req, res) => {
     const signature = req.headers['x-razorpay-signature'];
@@ -194,7 +208,40 @@ const handleRazorpayWebhook = async (req, res) => {
         console.log(`[Audit] Webhook received for Razorpay Order: ${rzpOrderId}, Payment: ${paymentId}`);
         
         if (rzpOrderId) {
-            await markOrderAsPaidByRzpId(rzpOrderId, paymentId);
+            // Find invoice by RAZORPAY order ID
+            const [invoices] = await pool.query(
+                "SELECT id, order_id FROM invoices WHERE razorpay_order_id = ?", 
+                [rzpOrderId]
+            );
+            
+            if (invoices.length === 0) {
+                console.error(`[Audit] FAILED: No local invoice found for Razorpay Order: ${rzpOrderId}`);
+            } else {
+                const invoice = invoices[0];
+                // CRITICAL FIX: Reuse the exact same function used by the simulated flow
+                await invoiceService.markInvoiceAsPaid(invoice.id, paymentId);
+                console.log(`[Audit] SUCCESS: Order #${invoice.order_id} marked as PAID via shared invoice service.`);
+
+                // Notify Admin (optional, can be kept here or moved to the service)
+                try {
+                    const [details] = await pool.query(
+                        "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
+                        [invoice.order_id]
+                    );
+                    if (details.length > 0) {
+                        const { business_id, owner_id, total_amount, customer_name } = details[0];
+                        const app = require('../app');
+                        const io = typeof app.get === 'function' ? app.get('io') : null;
+                        const notificationService = require('./notification.service');
+                        if (owner_id && io) {
+                            await notificationService.createNotification(
+                                io, business_id, owner_id, "Payment Received! 💰", 
+                                `Payment of ₹${total_amount} received from ${customer_name} for Order #${invoice.order_id}.`
+                            );
+                        }
+                    }
+                } catch (nErr) { console.error("[Audit] Notification Error:", nErr.message); }
+            }
         } else {
             console.error("[Audit] FAILED: No Razorpay Order ID found in payload.");
         }
@@ -205,148 +252,8 @@ const handleRazorpayWebhook = async (req, res) => {
     return res.status(200).send('OK');
 };
 
-const markOrderAsPaidByRzpId = async (rzpOrderId, paymentId = null) => {
-    console.log(`[Audit] Searching for Invoice with Razorpay Order ID: ${rzpOrderId}`);
-    const connection = await pool.getConnection();
-    try {
-        await connection.beginTransaction();
-
-        // Step 1: Find invoice by RAZORPAY order ID
-        const [invoices] = await connection.query(
-            "SELECT id, order_id, status FROM invoices WHERE razorpay_order_id = ?", 
-            [rzpOrderId]
-        );
-        
-        if (invoices.length === 0) {
-            console.error(`[Audit] FAILED: No local invoice found for Razorpay Order: ${rzpOrderId}`);
-            await connection.rollback();
-            return;
-        }
-
-        const invoice = invoices[0];
-        const orderId = invoice.order_id;
-
-        if (invoice.status === 'paid') {
-            console.log(`[Audit] Order #${orderId} is already PAID. Skipping.`);
-            await connection.rollback();
-            return;
-        }
-
-        // Step 2: Update BOTH Order and Invoice
-        await connection.query("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [orderId]);
-        await connection.query(
-            "UPDATE invoices SET status = 'paid', paid_at = NOW(), razorpay_payment_id = ?, used_at = NOW() WHERE id = ?",
-            [paymentId, invoice.id]
-        );
-
-        await connection.commit();
-        console.log(`[Audit] SUCCESS: Order #${orderId} marked as PAID via Razorpay Order ID link.`);
-
-        // Notify Admin
-        try {
-            const [details] = await connection.query(
-                "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
-                [orderId]
-            );
-            if (details.length > 0) {
-                const { business_id, owner_id, total_amount, customer_name } = details[0];
-                const app = require('../app');
-                const io = typeof app.get === 'function' ? app.get('io') : null;
-                const notificationService = require('./notification.service');
-                if (owner_id && io) {
-                    await notificationService.createNotification(
-                        io, business_id, owner_id, "Payment Received! 💰", 
-                        `Payment of ₹${total_amount} received from ${customer_name} for Order #${orderId}.`
-                    );
-                }
-            }
-        } catch (nErr) { console.error("[Audit] Notification Error:", nErr.message); }
-
-    } catch (error) {
-        await connection.rollback();
-        console.error(`[Audit] RECONCILIATION FAILURE:`, error.message);
-    } finally {
-        connection.release();
-    }
-};
-
-const markOrderAsPaid = async (orderId, paymentId = null) => {
-    console.log(`[Audit] Starting Database Update for Order #${orderId}...`);
-    const connection = await pool.getConnection();
-    
-    try {
-        await connection.beginTransaction();
-
-        // Step 4: Verify Invoice Lookup
-        const [invoices] = await connection.query(
-            "SELECT id, status FROM invoices WHERE order_id = ?", [orderId]
-        );
-        
-        if (invoices.length === 0) {
-            console.error(`[Audit] FAILED: No matching invoice found for Order #${orderId}`);
-            await connection.rollback();
-            return;
-        }
-
-        if (invoices[0].status === 'paid') {
-            console.log(`[Audit] SKIP: Order #${orderId} is already marked as PAID.`);
-            await connection.rollback();
-            return;
-        }
-
-        // Step 5: Execute and Log Affected Rows
-        const [orderResult] = await connection.query(
-            "UPDATE orders SET payment_status = 'paid' WHERE id = ?", [orderId]
-        );
-        console.log(`[Audit] Orders Update: ${orderResult.affectedRows} row(s) affected.`);
-
-        const [invoiceResult] = await connection.query(
-            "UPDATE invoices SET status = 'paid', paid_at = NOW(), razorpay_payment_id = ?, used_at = NOW() WHERE order_id = ?",
-            [paymentId, orderId]
-        );
-        console.log(`[Audit] Invoices Update: ${invoiceResult.affectedRows} row(s) affected.`);
-
-        // Step 6: Commit Transaction
-        await connection.commit();
-        console.log(`[Audit] SUCCESS: Transaction committed for Order #${orderId}`);
-
-        // Step 7: Post-Update Verification
-        const [finalOrder] = await connection.query("SELECT payment_status FROM orders WHERE id = ?", [orderId]);
-        console.log(`[Audit] Final Database State for Order #${orderId}: ${finalOrder[0].payment_status}`);
-
-        // Notification (Decoupled)
-        try {
-            const [details] = await connection.query(
-                "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
-                [orderId]
-            );
-
-            if (details.length > 0) {
-                const { business_id, owner_id, total_amount, customer_name } = details[0];
-                const app = require('../app');
-                const io = typeof app.get === 'function' ? app.get('io') : null;
-                const notificationService = require('./notification.service');
-
-                if (owner_id && io) {
-                    await notificationService.createNotification(
-                        io, business_id, owner_id, "Payment Received! 💰", 
-                        `Payment of ₹${total_amount} received from ${customer_name} for Order #${orderId}.`
-                    );
-                }
-            }
-        } catch (nErr) { console.error("[Audit] Notification Error:", nErr.message); }
-
-    } catch (error) {
-        await connection.rollback();
-        console.error(`[Audit] CRITICAL FAILURE for Order #${orderId}:`, error.message);
-    } finally {
-        connection.release();
-    }
-};
-
 module.exports = {
     createCheckoutSession,
     handleStripeWebhook,
-    handleRazorpayWebhook,
-    markOrderAsPaid
+    handleRazorpayWebhook
 };

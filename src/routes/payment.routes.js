@@ -46,7 +46,8 @@ router.post('/webhook/razorpay', async (req, res) => {
     await paymentService.handleRazorpayWebhook(req, res);
 });
 
-module.exports = router;
+const { pool } = require('../db/connection');
+const invoiceService = require('../services/invoice.service');
 
 // 5. Secret Manual Sync (For Testing/Fail-safe)
 router.get('/force-sync/:orderId', async (req, res) => {
@@ -54,8 +55,13 @@ router.get('/force-sync/:orderId', async (req, res) => {
     if (secret !== 'flowops_sync_2026') return res.status(403).send('Forbidden');
     
     try {
-        await paymentService.markOrderAsPaid(req.params.orderId);
-        res.send(`✅ Order #${req.params.orderId} forced to PAID successfully!`);
+        const [invoices] = await pool.query("SELECT id FROM invoices WHERE order_id = ?", [req.params.orderId]);
+        if (invoices.length > 0) {
+            await invoiceService.markInvoiceAsPaid(invoices[0].id);
+            res.send(`✅ Order #${req.params.orderId} forced to PAID successfully!`);
+        } else {
+            res.status(404).send(`❌ No invoice found for Order #${req.params.orderId}`);
+        }
     } catch (e) {
         res.status(500).send(`❌ Sync Failed: ${e.message}`);
     }

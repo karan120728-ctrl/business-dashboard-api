@@ -102,21 +102,24 @@ class InvoiceService {
         return invoice;
     }
 
-    async simulatePayment(token) {
-        const invoice = await this.getInvoiceByToken(token);
-
-        if (invoice.status === 'paid') {
-            throw new AppError("Invoice is already paid", 400);
-        }
-
+    async markInvoiceAsPaid(invoiceId, paymentId = null) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
 
-            // Update invoice status atomically
+            const [invoices] = await connection.query("SELECT status, order_id FROM invoices WHERE id = ?", [invoiceId]);
+            if (invoices.length === 0) throw new AppError("Invoice not found", 404);
+            const invoice = invoices[0];
+            
+            if (invoice.status === 'paid') {
+                await connection.rollback();
+                return { message: "Invoice is already paid", invoice_id: invoiceId };
+            }
+
+            // Update invoice status atomically (now includes paid_at and razorpay_payment_id)
             await connection.query(
-                `UPDATE invoices SET status = 'paid', used_at = NOW(), updated_at = NOW() WHERE id = ?`,
-                [invoice.id]
+                `UPDATE invoices SET status = 'paid', used_at = NOW(), updated_at = NOW(), paid_at = NOW(), razorpay_payment_id = ? WHERE id = ?`,
+                [paymentId, invoiceId]
             );
 
             // Sync order payment status atomically
@@ -126,13 +129,18 @@ class InvoiceService {
             );
 
             await connection.commit();
-            return { message: "Payment successful", invoice_id: invoice.id };
+            return { message: "Payment successful", invoice_id: invoiceId };
         } catch (error) {
             await connection.rollback();
             throw error;
         } finally {
             connection.release();
         }
+    }
+
+    async simulatePayment(token) {
+        const invoice = await this.getInvoiceByToken(token);
+        return await this.markInvoiceAsPaid(invoice.id);
     }
 
     async markOverdue() {
