@@ -182,7 +182,10 @@ const handleRazorpayWebhook = async (req, res) => {
             "INSERT INTO payment_audit_logs (event_type, payload, status) VALUES (?, ?, ?)",
             [payload.event, JSON.stringify(payload), isValid ? 'verified' : 'invalid_signature']
         );
-    } catch (e) { console.error("Failed to log audit:", e.message); }
+    } catch (e) { 
+        console.error("Failed to log audit:", e.message); 
+        return res.status(500).send(`DB Error: ${e.message}`);
+    }
 
     if (!isValid) {
         console.error("[Audit] FAILED: Invalid Razorpay Signature.");
