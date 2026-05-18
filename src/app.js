@@ -55,6 +55,24 @@ connectDB().then(async () => {
   try {
     await pool.query("ALTER TABLE orders MODIFY COLUMN proof_image_url LONGTEXT;");
     console.log("✅ DATABASE MIGRATION: proof_image_url forced to LONGTEXT");
+    
+    // 🔥 CRITICAL FIX: Force add the missing columns to existing invoices table
+    try { await pool.query("ALTER TABLE invoices ADD COLUMN razorpay_order_id VARCHAR(255) NULL"); } catch(e){}
+    try { await pool.query("ALTER TABLE invoices ADD COLUMN razorpay_payment_id VARCHAR(255) NULL"); } catch(e){}
+    try { await pool.query("ALTER TABLE invoices ADD COLUMN paid_at DATETIME NULL"); } catch(e){}
+    
+    // 🔥 CRITICAL FIX: Ensure audit table exists directly on startup
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_audit_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        event_type VARCHAR(255),
+        payload LONGTEXT,
+        order_id VARCHAR(50),
+        status VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("✅ DATABASE MIGRATION: Payment columns and audit table ensured.");
   } catch(e) {
     console.log("Database migration note:", e.message);
   }
