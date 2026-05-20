@@ -58,11 +58,17 @@ router.get('/force-sync/:orderId', async (req, res) => {
         const [invoices] = await pool.query("SELECT id FROM invoices WHERE order_id = ?", [req.params.orderId]);
         if (invoices.length > 0) {
             await invoiceService.markInvoiceAsPaid(invoices[0].id);
+            if (req.query.redirect === 'true') {
+                return res.redirect('https://business-dashboard-api.vercel.app/index.html?status=success');
+            }
             res.send(`✅ Order #${req.params.orderId} forced to PAID successfully!`);
         } else {
             res.status(404).send(`❌ No invoice found for Order #${req.params.orderId}`);
         }
     } catch (e) {
+        if (req.query.redirect === 'true') {
+            return res.redirect('https://business-dashboard-api.vercel.app/index.html?status=error');
+        }
         res.status(500).send(`❌ Sync Failed: ${e.message}`);
     }
 });

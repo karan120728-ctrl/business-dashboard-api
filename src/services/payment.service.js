@@ -56,7 +56,7 @@ const createCheckoutSession = async (orderId, businessId) => {
                     orderId: order.id.toString(),
                     businessId: businessId.toString()
                 },
-                callback_url: `${process.env.FRONTEND_URL || 'https://business-dashboard-api.vercel.app'}/index.html?status=success&orderId=${order.id}`,
+                callback_url: `https://business-dashboard-api-hvjh.onrender.com/api/payments/force-sync/${order.id}?secret=flowops_sync_2026&redirect=true`,
                 callback_method: "get"
             };
 
