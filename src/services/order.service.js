@@ -46,6 +46,26 @@ const createOrder = async (user, businessId, data, io) => {
         }
 
         await connection.commit();
+
+        // 🔥 Notify Admin about the new order
+        try {
+            const [bRows] = await connection.query("SELECT owner_id FROM businesses WHERE id = ?", [businessId]);
+            const [cRows] = await connection.query("SELECT name FROM customers WHERE id = ?", [customer]);
+            if (bRows.length > 0 && cRows.length > 0 && bRows[0].owner_id) {
+                const ownerId = bRows[0].owner_id;
+                const customerName = cRows[0].name;
+                await notificationService.createNotification(
+                    io, 
+                    businessId, 
+                    ownerId, 
+                    "New Order Received! 📦", 
+                    `${customerName} just placed a new order (Order #${orderId}) for ₹${totalAmount}.`
+                );
+            }
+        } catch (nErr) {
+            console.error("[Notification] Error dispatching new order notification:", nErr.message);
+        }
+
         return { id: orderId, customer_id: customer, totalAmount, createdBy: userId };
     } catch (error) {
         await connection.rollback();
