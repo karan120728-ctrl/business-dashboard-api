@@ -225,25 +225,7 @@ const handleRazorpayWebhook = async (req, res) => {
                 await invoiceService.markInvoiceAsPaid(invoice.id, paymentId);
                 console.log(`[Audit] SUCCESS: Order #${invoice.order_id} marked as PAID via shared invoice service.`);
 
-                // Notify Admin (optional, can be kept here or moved to the service)
-                try {
-                    const [details] = await pool.query(
-                        "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
-                        [invoice.order_id]
-                    );
-                    if (details.length > 0) {
-                        const { business_id, owner_id, total_amount, customer_name } = details[0];
-                        const app = require('../app');
-                        const io = typeof app.get === 'function' ? app.get('io') : null;
-                        const notificationService = require('./notification.service');
-                        if (owner_id && io) {
-                            await notificationService.createNotification(
-                                io, business_id, owner_id, "Payment Received! 💰", 
-                                `Payment of ₹${total_amount} received from ${customer_name} for Order #${invoice.order_id}.`
-                            );
-                        }
-                    }
-                } catch (nErr) { console.error("[Audit] Notification Error:", nErr.message); }
+
             }
         } else {
             console.error("[Audit] FAILED: No Razorpay Order ID found in payload.");

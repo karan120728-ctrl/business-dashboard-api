@@ -129,6 +129,30 @@ class InvoiceService {
             );
 
             await connection.commit();
+
+            // 🔥 DISPATCH NOTIFICATION
+            try {
+                const [details] = await pool.query(
+                    "SELECT o.business_id, o.total_amount, b.owner_id, c.name as customer_name FROM orders o JOIN businesses b ON o.business_id = b.id JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
+                    [invoice.order_id]
+                );
+                if (details.length > 0) {
+                    const { business_id, owner_id, total_amount, customer_name } = details[0];
+                    const app = require('../app');
+                    const io = typeof app.get === 'function' ? app.get('io') : null;
+                    const notificationService = require('./notification.service');
+                    if (owner_id && io) {
+                        await notificationService.createNotification(
+                            io, business_id, owner_id, "Payment Received! 💰", 
+                            `Payment of ₹${total_amount} received from ${customer_name} for Order #${invoice.order_id}.`
+                        );
+                        console.log(`[Notification] Payment success sent to Admin for Order #${invoice.order_id}`);
+                    }
+                }
+            } catch (nErr) { 
+                console.error("[Notification] Error dispatching payment notification:", nErr.message); 
+            }
+
             return { message: "Payment successful", invoice_id: invoiceId };
         } catch (error) {
             await connection.rollback();
