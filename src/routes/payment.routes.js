@@ -55,9 +55,10 @@ router.get('/force-sync/:orderId', async (req, res) => {
     if (secret !== 'flowops_sync_2026') return res.status(403).send('Forbidden');
     
     try {
+        const io = req.app.get('io');
         const [invoices] = await pool.query("SELECT id FROM invoices WHERE order_id = ?", [req.params.orderId]);
         if (invoices.length > 0) {
-            await invoiceService.markInvoiceAsPaid(invoices[0].id);
+            await invoiceService.markInvoiceAsPaid(invoices[0].id, null, io);
             if (req.query.redirect === 'true') {
                 return res.redirect('https://business-dashboard-api.vercel.app/index.html?status=success');
             }

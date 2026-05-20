@@ -102,7 +102,7 @@ class InvoiceService {
         return invoice;
     }
 
-    async markInvoiceAsPaid(invoiceId, paymentId = null) {
+    async markInvoiceAsPaid(invoiceId, paymentId = null, io = null) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -138,8 +138,6 @@ class InvoiceService {
                 );
                 if (details.length > 0) {
                     const { business_id, owner_id, total_amount, customer_name } = details[0];
-                    const app = require('../app');
-                    const io = typeof app.get === 'function' ? app.get('io') : null;
                     const notificationService = require('./notification.service');
                     if (owner_id && io) {
                         await notificationService.createNotification(
