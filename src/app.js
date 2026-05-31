@@ -197,6 +197,11 @@ app.get("/api/seed", async (req, res) => {
     await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Admin User','admin@flowops.com',?,'admin')`, [defaultBusId, adminHash]);
     await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Demo Driver','driver@flowops.com',?,'driver')`, [defaultBusId, demoHash]);
     await pool.query(`INSERT IGNORE INTO users (business_id, name, email, password, role) VALUES (?, 'Demo Customer','customer@flowops.com',?,'customer')`, [defaultBusId, demoHash]);
+    
+    // FORCE-RESET demo passwords (fixes 401 if accounts existed with wrong hash)
+    await pool.query(`UPDATE users SET password = ?, business_id = ? WHERE email = 'admin@flowops.com'`, [adminHash, defaultBusId]);
+    await pool.query(`UPDATE users SET password = ?, business_id = ? WHERE email = 'driver@flowops.com'`, [demoHash, defaultBusId]);
+    await pool.query(`UPDATE users SET password = ?, business_id = ? WHERE email = 'customer@flowops.com'`, [demoHash, defaultBusId]);
     await pool.query(`INSERT IGNORE INTO customers (business_id, name, email, phone) VALUES (?, 'Acme Corp','contact@acme.com','555-0101'),(?, 'Globex','info@globex.com','555-0102'),(?, 'Soylent Corp','hello@soylent.com','555-0103')`, [defaultBusId, defaultBusId, defaultBusId]);
     await pool.query(`INSERT IGNORE INTO products (business_id, name, price, description) VALUES (?, 'SaaS Starter Plan',49.99,'Basic monthly subscription'),(?, 'SaaS Pro Plan',99.99,'Advanced monthly subscription'),(?, 'Enterprise License',999.00,'Yearly enterprise access')`, [defaultBusId, defaultBusId, defaultBusId]);
     
