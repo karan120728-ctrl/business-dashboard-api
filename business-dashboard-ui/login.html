@@ -95,7 +95,7 @@
                 if (response.ok) {
                     localStorage.setItem('flowops_token', data.token);
                     localStorage.setItem('flowops_user', JSON.stringify(data.user));
-                    window.location.href = 'index.html';
+                    window.location.href = 'dashboard.html';
                 } else {
                     showToast(data.message || 'Login failed', 'error');
                 }
