@@ -25,11 +25,17 @@
     padding: 0;
 }
 
+html, body.home-body {
+    overflow-x: hidden;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
 body.home-body {
     background-color: var(--bg-dark);
     color: var(--text-white);
     font-family: var(--font-inter);
-    overflow-x: hidden;
     min-height: 100vh;
     position: relative;
 }
@@ -214,10 +220,36 @@ section.home-section {
     font-size: 0.8rem;
     font-weight: 600;
     margin-bottom: 1.5rem;
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+    word-break: break-word;
 }
 
 .badge-featured i {
     color: #f59e0b;
+}
+
+.hero-gradient {
+    background: linear-gradient(135deg, var(--primary) 0%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.btn-hero {
+    padding: 0.8rem 2rem;
+    font-size: 1rem;
+}
+
+.glowing-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
 }
 
 .hero-content h1 {
@@ -792,7 +824,23 @@ footer.home-footer {
     80%, 100% { transform: scale(1.6); opacity: 0; }
 }
 
-/* Mobile Responsiveness Overrides for Navbar */
+/* Mobile Responsiveness Overrides for Navbar and Content */
+@media (max-width: 768px) {
+    .orb {
+        display: none !important; /* Hide massive glowing orbs on mobile to prevent overflow */
+    }
+    section.home-section {
+        padding: 5.5rem 1rem 2.5rem; /* Reduce padding on mobile */
+    }
+    .hero-content h1 {
+        font-size: 2.2rem; /* Scale down hero title */
+    }
+    .hero-content p {
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+    }
+}
+
 @media (max-width: 640px) {
     header.home-header {
         padding: 0.75rem 1rem;
@@ -807,6 +855,30 @@ footer.home-footer {
     }
     .logo {
         font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-content h1 {
+        font-size: 1.8rem; /* Scale down further on very small screens */
+    }
+    .badge-featured {
+        font-size: 0.72rem;
+        padding: 0.35rem 0.75rem;
+        text-align: center;
+    }
+    .hero-ctas {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+    }
+    .hero-ctas .btn-home {
+        width: 100%;
+        text-align: center;
+    }
+    .btn-hero {
+        padding: 0.6rem 1.5rem;
+        font-size: 0.9rem;
     }
 }
 
