@@ -228,6 +228,7 @@ body.sidebar-open {
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 10px 0 15px -3px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
 }
 
 .sidebar.sidebar-open {
@@ -881,12 +882,16 @@ body.sidebar-open .main-content {
     }
 }
 
-/* Modal sizing on mobile */
+/* Modal and Card sizing on mobile */
 @media (max-width: 480px) {
     .modal-content {
         padding: 1.5rem;
         max-width: 95% !important;
         margin: 0 0.5rem;
+    }
+    
+    .auth-card {
+        padding: 1.5rem 1.25rem;
     }
     
     .toolbar {

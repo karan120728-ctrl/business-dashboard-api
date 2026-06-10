@@ -377,6 +377,7 @@ section.home-section {
     font-size: 0.8rem;
     z-index: 10;
     transition: all 0.3s;
+    transform: translate(-50%, -50%);
 }
 
 .map-node.active {
@@ -439,8 +440,8 @@ section.home-section {
     stroke: var(--primary);
     stroke-width: 2.5;
     stroke-linecap: round;
-    stroke-dasharray: 300;
-    stroke-dashoffset: 300;
+    stroke-dasharray: 160;
+    stroke-dashoffset: 160;
     transition: stroke-dashoffset 1s ease-out;
 }
 
@@ -879,6 +880,24 @@ footer.home-footer {
     .btn-hero {
         padding: 0.6rem 1.5rem;
         font-size: 0.9rem;
+    }
+    .glass-panel {
+        padding: 0.75rem;
+    }
+    .simulator-panel {
+        padding: 0.5rem;
+    }
+    .sim-btn-group {
+        grid-template-columns: 1fr;
+    }
+    .proof-popup {
+        width: 100px;
+        bottom: 1rem;
+        right: 1rem;
+        padding: 0.3rem;
+    }
+    .proof-img {
+        height: 45px;
     }
 }
 

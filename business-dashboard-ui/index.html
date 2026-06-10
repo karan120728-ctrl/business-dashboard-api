@@ -64,9 +64,9 @@
                     
                     <!-- SVG Network Map Animation -->
                     <div class="map-canvas" id="canvas-container">
-                        <svg class="svg-connectors" viewBox="0 0 440 260" preserveAspectRatio="none" style="width: 100%; height: 100%;">
-                            <path class="connector-path" d="M 45,210 L 180,70 L 292,182 L 382,56" />
-                            <path id="svg-fill-path" class="connector-fill" d="M 45,210 L 180,70 L 292,182 L 382,56" />
+                        <svg class="svg-connectors" viewBox="0 0 100 100" preserveAspectRatio="none" style="width: 100%; height: 100%;">
+                            <path class="connector-path" d="M 10,75 L 40,25 L 65,65 L 85,20" />
+                            <path id="svg-fill-path" class="connector-fill" d="M 10,75 L 40,25 L 65,65 L 85,20" />
                         </svg>
                         
                         <!-- Tracked Vehicle -->
@@ -337,8 +337,8 @@
         const proofPopup = document.getElementById('proof-popup');
 
         // Path offsets for dash array fill animation
-        // Approximate total length is 450px
-        const fillOffsets = [300, 190, 95, 0];
+        // Approximate total length is 160 units in 100x100 viewBox
+        const fillOffsets = [160, 102, 50, 0];
 
         function updateSimulator() {
             // Move truck
