@@ -176,11 +176,20 @@ const updateUser = async (id, updateData) => {
     return true;
 };
 
+const updatePushToken = async (userId, pushToken) => {
+    await pool.query(
+        "UPDATE users SET push_token = ? WHERE id = ?",
+        [pushToken, userId]
+    );
+    return true;
+};
+
 module.exports = {
     createUser,
     loginUser,
     forgotPassword,
     resetPassword,
     getAllUsers,
-    updateUser
+    updateUser,
+    updatePushToken
 };

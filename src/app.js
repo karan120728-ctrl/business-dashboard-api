@@ -60,6 +60,7 @@ connectDB().then(async () => {
     try { await pool.query("ALTER TABLE invoices ADD COLUMN razorpay_order_id VARCHAR(255) NULL"); } catch(e){}
     try { await pool.query("ALTER TABLE invoices ADD COLUMN razorpay_payment_id VARCHAR(255) NULL"); } catch(e){}
     try { await pool.query("ALTER TABLE invoices ADD COLUMN paid_at DATETIME NULL"); } catch(e){}
+    try { await pool.query("ALTER TABLE users ADD COLUMN push_token VARCHAR(255) NULL"); } catch(e){}
     
     // 🔥 CRITICAL FIX: Ensure audit table exists directly on startup
     await pool.query(`
@@ -86,6 +87,11 @@ io.on("connection", (socket) => {
   socket.on("join", (userId) => {
     socket.join(`user_${userId}`);
     console.log(`User ${userId} joined their notification room.`);
+  });
+
+  socket.on("joinOrder", (orderId) => {
+    socket.join(`order_${orderId}`);
+    console.log(`Client joined tracking room for Order #${orderId}`);
   });
 
   socket.on("disconnect", () => {

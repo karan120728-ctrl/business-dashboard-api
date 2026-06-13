@@ -26,6 +26,7 @@ const initDB = async () => {
         role ENUM('superadmin', 'admin', 'driver', 'customer') DEFAULT 'customer',
         reset_token_hash VARCHAR(255),
         reset_expires TIMESTAMP NULL,
+        push_token VARCHAR(255) NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

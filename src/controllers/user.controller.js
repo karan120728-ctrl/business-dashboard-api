@@ -79,4 +79,16 @@ const resetPassword = async (req, res) => {
     }
 };
 
-module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword };
+const updatePushToken = async (req, res) => {
+    try {
+        const { pushToken } = req.body;
+        if (!pushToken) throw new AppError("Push token is required", 400);
+
+        await userService.updatePushToken(req.user.id, pushToken);
+        return sendSuccess(res, 200, null, "Push token registered successfully");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
+module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken };

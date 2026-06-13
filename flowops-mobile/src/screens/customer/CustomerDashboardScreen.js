@@ -1,0 +1,165 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, ActivityIndicator, Alert,
+} from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import { apiRequest } from '../../api/client';
+import { ENDPOINTS } from '../../config/config';
+
+const STATUS_COLORS = {
+  pending: '#f59e0b', processing: '#6366f1',
+  out_for_delivery: '#3b82f6', delivered: '#10b981', cancelled: '#ef4444',
+};
+
+export default function CustomerDashboardScreen({ navigation }) {
+  const { user, logout } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiRequest(ENDPOINTS.ORDERS);
+      setOrders(res.data || res.orders || res || []);
+    } catch (e) { Alert.alert('Error', e.message); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleLogout = () => {
+    Alert.alert('Sign Out', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    ]);
+  };
+
+  const renderOrder = ({ item }) => {
+    const color = STATUS_COLORS[item.status] || '#64748b';
+    const isActive = item.status === 'out_for_delivery';
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.orderId}>Order #{item.id}</Text>
+          <View style={[styles.badge, { backgroundColor: color + '20' }]}>
+            <Text style={[styles.badgeText, { color }]}>{item.status?.replace(/_/g, ' ').toUpperCase()}</Text>
+          </View>
+        </View>
+        <Text style={styles.info}>📦 {item.product_name || '—'} × {item.quantity}</Text>
+        <Text style={styles.info}>💰 ${parseFloat(item.total_price || 0).toFixed(2)}</Text>
+        {item.driver_name && <Text style={styles.info}>🚛 Driver: {item.driver_name}</Text>}
+
+        <View style={styles.actionRow}>
+          {isActive && (
+            <TouchableOpacity
+              style={styles.trackBtn}
+              onPress={() => navigation.navigate('TrackOrder', { orderId: item.id })}
+            >
+              <Text style={styles.trackBtnText}>📍 Track Live</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.invoiceBtn}
+            onPress={() => navigation.navigate('Invoices')}
+          >
+            <Text style={styles.invoiceBtnText}>🧾 Invoice</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const active = orders.filter(o => o.status === 'out_for_delivery').length;
+  const delivered = orders.filter(o => o.status === 'delivered').length;
+
+  return (
+    <View style={styles.bg}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
+          <Text style={styles.role}>CUSTOMER PORTAL</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.invoicesHeaderBtn} onPress={() => navigation.navigate('Invoices')}>
+            <Text style={styles.invoicesHeaderText}>🧾 Invoices</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>Out</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Stats Strip */}
+      <View style={styles.statsStrip}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNum}>{orders.length}</Text>
+          <Text style={styles.statLabel}>Total Orders</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNum, { color: '#3b82f6' }]}>{active}</Text>
+          <Text style={styles.statLabel}>In Transit</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNum, { color: '#10b981' }]}>{delivered}</Text>
+          <Text style={styles.statLabel}>Delivered</Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>My Orders</Text>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={i => String(i.id)}
+          renderItem={renderOrder}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#4f46e5" />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>📦</Text>
+              <Text style={styles.emptyText}>No orders yet.</Text>
+            </View>
+          }
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#4f46e5', padding: 16 },
+  greeting: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  role: { fontSize: 11, color: '#c7d2fe', marginTop: 2, fontWeight: '600' },
+  headerRight: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  invoicesHeaderBtn: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  invoicesHeaderText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  logoutBtn: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  logoutText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  statsStrip: { flexDirection: 'row', backgroundColor: '#fff', padding: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  statItem: { flex: 1, alignItems: 'center' },
+  statNum: { fontSize: 22, fontWeight: '800', color: '#4f46e5' },
+  statLabel: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: '#e2e8f0' },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  orderId: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  badgeText: { fontSize: 10, fontWeight: '700' },
+  info: { fontSize: 13, color: '#475569', marginTop: 2 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  trackBtn: { flex: 1, backgroundColor: '#eff6ff', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' },
+  trackBtnText: { fontSize: 13, fontWeight: '700', color: '#3b82f6' },
+  invoiceBtn: { flex: 1, backgroundColor: '#faf5ff', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e9d5ff' },
+  invoiceBtnText: { fontSize: 13, fontWeight: '700', color: '#7c3aed' },
+  empty: { alignItems: 'center', marginTop: 60 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyText: { fontSize: 16, fontWeight: '700', color: '#94a3b8' },
+});

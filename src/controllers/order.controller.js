@@ -66,12 +66,30 @@ const assignDriver = async (req, res) => {
 
 const updateLocation = async (req, res) => {
     try {
-        const { delivery_location, lat, lng, address } = req.body;
-        if (!delivery_location && (!lat || !lng)) {
+        const { delivery_location, address } = req.body;
+        const lat = req.body.lat !== undefined ? req.body.lat : req.body.latitude;
+        const lng = req.body.lng !== undefined ? req.body.lng : req.body.longitude;
+        
+        if (!delivery_location && (lat === undefined || lng === undefined)) {
             throw new AppError("Missing location coordinates", 400);
         }
 
         const result = await orderService.updateLocation(req.params.id, req.user.business_id, { delivery_location, lat, lng, address });
+        
+        // Emit live location update via Socket.io to the order room
+        try {
+            const io = req.app.get("io");
+            if (io) {
+                io.to(`order_${req.params.id}`).emit("locationUpdate", {
+                    orderId: req.params.id,
+                    delivery_location: result.location,
+                    current_address: result.address
+                });
+            }
+        } catch (socketErr) {
+            console.error("[Socket.io] Error emitting location update:", socketErr.message);
+        }
+
         return res.json({ message: "Location updated", location: result.location, address: result.address });
     } catch (error) {
         return sendError(res, error);
