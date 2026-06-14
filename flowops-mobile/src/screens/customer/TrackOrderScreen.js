@@ -1,90 +1,118 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Alert, SafeAreaView, Platform,
+  ActivityIndicator, SafeAreaView,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import io from 'socket.io-client';
 import { apiRequest } from '../../api/client';
 import { ENDPOINTS, API_URL } from '../../config/config';
 
+const buildMapHTML = (lat, lng, driverName) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #map { width: 100%; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map').setView([${lat}, ${lng}], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    var truckIcon = L.divIcon({
+      html: '<div style="background:#4f46e5;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,0.3);">🚛</div>',
+      className: '',
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+    });
+
+    var marker = L.marker([${lat}, ${lng}], { icon: truckIcon })
+      .addTo(map)
+      .bindPopup('<b>${driverName || 'Driver'}</b><br>Live Location')
+      .openPopup();
+
+    // Listen for location updates from React Native
+    document.addEventListener('message', function(e) {
+      try {
+        var data = JSON.parse(e.data);
+        if (data.lat && data.lng) {
+          marker.setLatLng([data.lat, data.lng]);
+          map.setView([data.lat, data.lng], 15, { animate: true });
+        }
+      } catch(err) {}
+    });
+  </script>
+</body>
+</html>
+`;
+
+const DEFAULT_LAT = 28.6139;
+const DEFAULT_LNG = 77.2090;
+
 export default function TrackOrderScreen({ route, navigation }) {
   const { orderId } = route.params;
   const [loading, setLoading] = useState(true);
-  const [driverLocation, setDriverLocation] = useState(null); // { latitude, longitude }
+  const [driverLocation, setDriverLocation] = useState(null);
   const [driverInfo, setDriverInfo] = useState({ name: 'Awaiting Driver', vehicle: 'N/A', address: 'Pending dispatch...' });
   const [socketConnected, setSocketConnected] = useState(false);
-  const mapRef = useRef(null);
+  const webviewRef = useRef(null);
 
-  // Helper to parse "lat,lng" string from backend
-  const parseAndSetLocation = (locationStr, address = null, driverName = null, vehicleNum = null) => {
+  const applyLocation = (lat, lng, address, driverName, vehicleNum) => {
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    setDriverLocation({ lat, lng });
+    setDriverInfo(prev => ({
+      name: driverName || prev.name || 'Driver',
+      vehicle: vehicleNum || prev.vehicle || 'N/A',
+      address: address || prev.address || 'In transit',
+    }));
+
+    // Push update into WebView map
+    if (webviewRef.current) {
+      webviewRef.current.postMessage(JSON.stringify({ lat, lng }));
+    }
+  };
+
+  const parseLocationStr = (locationStr, address, driverName, vehicleNum) => {
     if (!locationStr) return;
     const [latStr, lngStr] = locationStr.split(',');
-    const latitude = parseFloat(latStr);
-    const longitude = parseFloat(lngStr);
-
-    if (!isNaN(latitude) && !isNaN(longitude)) {
-      const newCoords = { latitude, longitude };
-      setDriverLocation(newCoords);
-      
-      // Update info
-      setDriverInfo(prev => ({
-        name: driverName || prev.name || 'Driver',
-        vehicle: vehicleNum || prev.vehicle || 'N/A',
-        address: address || prev.address || 'In transit'
-      }));
-
-      // Animate map to new location
-      if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          ...newCoords,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.015,
-        }, 1000);
-      }
-    }
+    const lat = parseFloat(latStr);
+    const lng = parseFloat(lngStr);
+    applyLocation(lat, lng, address, driverName, vehicleNum);
   };
 
   // 1. Socket.io Live Sync
   useEffect(() => {
-    // Determine socket server root by removing '/api' from the backend URL
     const socketUrl = API_URL.replace('/api', '');
-    console.log(`[Socket] Connecting to: ${socketUrl}`);
-    
-    const socket = io(socketUrl, {
-      transports: ['websocket'],
-      forceNew: true,
-    });
+    const socket = io(socketUrl, { transports: ['websocket'], forceNew: true });
 
     socket.on('connect', () => {
-      console.log('[Socket] Connected. Joining room for Order #' + orderId);
       setSocketConnected(true);
       socket.emit('joinOrder', orderId);
     });
 
     socket.on('locationUpdate', (data) => {
-      console.log('[Socket] Live location update received:', data);
       if (data.delivery_location) {
-        parseAndSetLocation(data.delivery_location, data.current_address);
+        parseLocationStr(data.delivery_location, data.current_address);
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log('[Socket] Disconnected.');
-      setSocketConnected(false);
-    });
+    socket.on('disconnect', () => setSocketConnected(false));
+    socket.on('connect_error', () => setSocketConnected(false));
 
-    socket.on('connect_error', (err) => {
-      console.warn('[Socket] Connection error:', err.message);
-      setSocketConnected(false);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [orderId]);
 
-  // 2. Polling Fallback (Activated only when Socket.io is disconnected)
+  // 2. HTTP Polling Fallback
   useEffect(() => {
     let pollInterval = null;
 
@@ -92,52 +120,36 @@ export default function TrackOrderScreen({ route, navigation }) {
       try {
         const res = await apiRequest(ENDPOINTS.GET_LOCATION(orderId));
         if (res) {
-          parseAndSetLocation(
-            res.delivery_location,
-            res.current_address,
-            res.driver_name,
-            res.vehicle_number
-          );
+          parseLocationStr(res.delivery_location, res.current_address, res.driver_name, res.vehicle_number);
         }
         setLoading(false);
-      } catch (err) {
-        console.warn('[Polling] Failed fetching location:', err.message);
+      } catch {
         setLoading(false);
       }
     };
 
-    // Initial fetch
     fetchLocation();
 
-    // Set up polling fallback loop if socket is offline
     if (!socketConnected) {
-      console.log('[Tracking] Activating HTTP polling fallback (5s)...');
       pollInterval = setInterval(fetchLocation, 5000);
     }
 
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
+    return () => { if (pollInterval) clearInterval(pollInterval); };
   }, [orderId, socketConnected]);
 
-  // Default region center: New Delhi
-  const defaultRegion = {
-    latitude: 28.6139,
-    longitude: 77.2090,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  };
+  const lat = driverLocation?.lat ?? DEFAULT_LAT;
+  const lng = driverLocation?.lng ?? DEFAULT_LNG;
 
   return (
     <SafeAreaView style={styles.bg}>
-      {/* Connection Indicator Bar */}
-      <View style={[styles.statusIndicator, { backgroundColor: socketConnected ? '#10b981' : '#f59e0b' }]}>
+      {/* Status Bar */}
+      <View style={[styles.statusBar, { backgroundColor: socketConnected ? '#10b981' : '#f59e0b' }]}>
         <Text style={styles.statusText}>
-          {socketConnected ? '📡  Live Real-time Tracking Active' : '⏱️  Offline (Polling GPS Fallback)'}
+          {socketConnected ? '📡  Live Real-time Tracking Active' : '⏱️  Polling GPS Fallback'}
         </Text>
       </View>
 
-      {/* Map View */}
+      {/* Map */}
       <View style={styles.mapContainer}>
         {loading ? (
           <View style={styles.loadingArea}>
@@ -145,23 +157,20 @@ export default function TrackOrderScreen({ route, navigation }) {
             <Text style={styles.loadingText}>Connecting to GPS satellite...</Text>
           </View>
         ) : (
-          <MapView
-            ref={mapRef}
+          <WebView
+            ref={webviewRef}
+            originWhitelist={['*']}
+            source={{ html: buildMapHTML(lat, lng, driverInfo.name) }}
             style={styles.map}
-            initialRegion={driverLocation ? { ...driverLocation, latitudeDelta: 0.015, longitudeDelta: 0.015 } : defaultRegion}
-          >
-            {driverLocation && (
-              <Marker
-                coordinate={driverLocation}
-                title={driverInfo.name}
-                description={driverInfo.vehicle}
-              >
-                <View style={styles.markerContainer}>
-                  <Text style={styles.markerEmoji}>🚛</Text>
-                </View>
-              </Marker>
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.loadingArea}>
+                <ActivityIndicator size="large" color="#4f46e5" />
+              </View>
             )}
-          </MapView>
+          />
         )}
       </View>
 
@@ -202,27 +211,12 @@ export default function TrackOrderScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#f8fafc' },
-  statusIndicator: { paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
+  statusBar: { paddingVertical: 6, alignItems: 'center' },
   statusText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   mapContainer: { flex: 1, backgroundColor: '#e2e8f0' },
-  map: { ...StyleSheet.absoluteFillObject },
+  map: { flex: 1 },
   loadingArea: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
-  markerContainer: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  markerEmoji: { fontSize: 20 },
   card: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
