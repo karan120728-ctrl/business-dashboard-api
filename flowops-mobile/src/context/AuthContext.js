@@ -20,36 +20,38 @@ Notifications.setNotificationHandler({
 
 const AuthContext = createContext(null);
 
-const registerForPushNotificationsAsync = async () => {
-  let token;
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
+const PROJECT_ID = '4578dfeb-211e-4598-ac03-06a68e6f947f';
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== 'granted') {
-    console.warn('Failed to get push token for push notification!');
+const registerForPushNotificationsAsync = async () => {
+  try {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.warn('Push notification permission not granted.');
+      return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+    console.log('[Push Token Registered]', tokenData.data);
+    return tokenData.data;
+  } catch (error) {
+    // Never crash the app over push token failures
+    console.warn('Push token registration skipped:', error.message);
     return null;
   }
-
-  try {
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log('[Push Token Registered]', token);
-  } catch (error) {
-    console.warn('Error fetching Expo push token:', error.message);
-  }
-
-  return token;
 };
 
 export const AuthProvider = ({ children }) => {
