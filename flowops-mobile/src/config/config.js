@@ -1,13 +1,14 @@
 // FlowOps API Configuration
 // Single source of truth for all API endpoints
 
-const DEV_API_URL = 'http://192.168.1.100:5000/api'; // Replace with your local machine IP when testing
+const DEV_API_URL = 'http://192.168.31.173:3000/api'; // Auto-detected local IP on port 3000
 const PROD_API_URL = 'https://business-dashboard-api-hvjh.onrender.com/api';
 
-// Set to false when running locally with npm start
+// Set to false when testing with Expo dev client (local server)
 const IS_PRODUCTION = true;
 
 export const API_URL = IS_PRODUCTION ? PROD_API_URL : DEV_API_URL;
+export const DEBUG_MODE = false; // Set to false for production releases
 
 export const ENDPOINTS = {
   // Auth

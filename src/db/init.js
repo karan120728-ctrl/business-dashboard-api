@@ -143,6 +143,25 @@ const initDB = async () => {
       )
     `);
 
+    // 8. Mobile Error Logs Table (For Diagnostics)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS mobile_error_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        error_message TEXT,
+        error_stack TEXT,
+        device_info TEXT,
+        screen_context VARCHAR(255),
+        user_id INT NULL,
+        user_role VARCHAR(50) NULL,
+        api_details TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Safety Migrations for existing tables
+    try { await connection.query("ALTER TABLE mobile_error_logs ADD COLUMN user_role VARCHAR(50) NULL;"); } catch(e){}
+    try { await connection.query("ALTER TABLE mobile_error_logs ADD COLUMN api_details TEXT NULL;"); } catch(e){}
+
     console.log("Multi-Tenant Database tables initialized successfully.");
     connection.release();
   } catch (error) {

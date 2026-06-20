@@ -4,6 +4,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 import { API_URL } from '../config/config';
+import { logError } from '../utils/logger';
 
 const TOKEN_KEY = 'flowops_token';
 const USER_KEY = 'flowops_user';
@@ -49,14 +50,35 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(`${API_URL}${endpoint}`, config);
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      const text = await response.text();
+      const error = new Error(`JSON parse error. Status: ${response.status}`);
+      error.url = `${API_URL}${endpoint}`;
+      error.method = options.method || 'GET';
+      error.status = response.status;
+      error.responseBody = text;
+      throw error;
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || `Request failed: ${response.status}`);
+      const error = new Error(data?.message || `Request failed: ${response.status}`);
+      error.url = `${API_URL}${endpoint}`;
+      error.method = options.method || 'GET';
+      error.status = response.status;
+      error.responseBody = data;
+      throw error;
     }
 
     return data;
   } catch (error) {
+    if (!error.url) {
+      error.url = `${API_URL}${endpoint}`;
+      error.method = options.method || 'GET';
+    }
+    logError(error, `API Request: ${options.method || 'GET'} ${endpoint}`);
     throw error;
   }
 };
@@ -66,7 +88,6 @@ export const apiUpload = async (endpoint, formData) => {
   const token = await getToken();
 
   const headers = {
-    'Content-Type': 'multipart/form-data',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
@@ -76,14 +97,36 @@ export const apiUpload = async (endpoint, formData) => {
       headers,
       body: formData,
     });
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      const text = await response.text();
+      const error = new Error(`JSON parse error. Status: ${response.status}`);
+      error.url = `${API_URL}${endpoint}`;
+      error.method = 'POST';
+      error.status = response.status;
+      error.responseBody = text;
+      throw error;
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || 'Upload failed');
+      const error = new Error(data?.message || 'Upload failed');
+      error.url = `${API_URL}${endpoint}`;
+      error.method = 'POST';
+      error.status = response.status;
+      error.responseBody = data;
+      throw error;
     }
 
     return data;
   } catch (error) {
+    if (!error.url) {
+      error.url = `${API_URL}${endpoint}`;
+      error.method = 'POST';
+    }
+    logError(error, `API Upload: POST ${endpoint}`);
     throw error;
   }
 };
+

@@ -69,7 +69,7 @@ export default function ProofScreen({ route, navigation }) {
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('proof', { uri: image.uri, type: image.type, name: image.name });
+      formData.append('proof_image', { uri: image.uri, type: image.type, name: image.name });
       await apiUpload(ENDPOINTS.SUBMIT_POD(orderId), formData);
       setSubmitted(true);
     } catch (e) {

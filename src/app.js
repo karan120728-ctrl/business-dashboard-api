@@ -278,6 +278,31 @@ app.use("/api", dashboardRoute);
 const paymentRoute = require("./routes/payment.routes.js");
 app.use("/api/payments", paymentRoute);
 
+// Route to log mobile app errors
+app.post("/api/logs/error", async (req, res) => {
+  const { error, stack, deviceInfo, screen, userId, userRole, apiDetails } = req.body;
+  console.error("📱 [MOBILE ERROR] Screen:", screen, "User:", userId, "Role:", userRole, "\nMessage:", error, "\nAPI Details:", apiDetails);
+  
+  try {
+    await pool.query(
+      `INSERT INTO mobile_error_logs (error_message, error_stack, device_info, screen_context, user_id, user_role, api_details) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        error || 'Unknown Error',
+        stack || null,
+        deviceInfo ? (typeof deviceInfo === 'object' ? JSON.stringify(deviceInfo) : String(deviceInfo)) : null,
+        screen || null,
+        userId || null,
+        userRole || null,
+        apiDetails ? (typeof apiDetails === 'object' ? JSON.stringify(apiDetails) : String(apiDetails)) : null
+      ]
+    );
+    res.json({ success: true, message: "Error log recorded" });
+  } catch (dbErr) {
+    console.error("Failed to write mobile log to DB:", dbErr.message);
+    res.status(500).json({ error: dbErr.message });
+  }
+});
+
 // start background jobs
 const { startCronJobs } = require("./utils/cronJobs");
 startCronJobs();

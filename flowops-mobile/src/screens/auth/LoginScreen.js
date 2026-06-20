@@ -30,7 +30,7 @@ export default function LoginScreen({ navigation }) {
   const quickLogin = (e, p) => { setEmail(e); setPassword(p); };
 
   return (
-    <KeyboardAvoidingView style={styles.bg} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.bg} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Logo */}
         <View style={styles.logoWrap}>
@@ -106,7 +106,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
+  scroll: { flexGrow: 1, padding: 20, paddingTop: 40, paddingBottom: 60 },
   logoWrap: { alignItems: 'center', marginBottom: 28 },
   logoIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   logoIconText: { fontSize: 26, color: '#fff' },

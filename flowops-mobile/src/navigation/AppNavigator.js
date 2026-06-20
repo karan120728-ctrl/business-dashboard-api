@@ -3,7 +3,7 @@
 // Uses React Navigation — no tabs, just stacks per role
 
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -21,6 +21,7 @@ import CustomersScreen from '../screens/admin/CustomersScreen';
 import ProductsScreen from '../screens/admin/ProductsScreen';
 import UsersScreen from '../screens/admin/UsersScreen';
 import PaymentsScreen from '../screens/admin/PaymentsScreen';
+import DebugLogsScreen from '../screens/DebugLogsScreen';
 
 // Driver Screens
 import DriverHomeScreen from '../screens/driver/DriverHomeScreen';
@@ -35,12 +36,15 @@ import TrackOrderScreen from '../screens/customer/TrackOrderScreen';
 const Stack = createNativeStackNavigator();
 
 const THEME = {
+  ...DefaultTheme,
   colors: {
+    ...DefaultTheme.colors,
     primary: '#4f46e5',
     background: '#f8fafc',
     card: '#ffffff',
     text: '#0f172a',
     border: '#e2e8f0',
+    notification: '#ef4444',
   },
 };
 
@@ -69,6 +73,7 @@ const AdminStack = () => (
     <Stack.Screen name="Products" component={ProductsScreen} options={{ title: 'Products' }} />
     <Stack.Screen name="Users" component={UsersScreen} options={{ title: 'Users' }} />
     <Stack.Screen name="Payments" component={PaymentsScreen} options={{ title: 'Payments' }} />
+    <Stack.Screen name="DebugLogs" component={DebugLogsScreen} options={{ title: 'App Debug Logs' }} />
   </Stack.Navigator>
 );
 

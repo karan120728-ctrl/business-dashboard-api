@@ -64,7 +64,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.bg} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.bg} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.logoWrap}>
           <View style={styles.logoIcon}><Text style={styles.logoIconText}>⬡</Text></View>
@@ -117,7 +117,7 @@ export default function RegisterScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
+  scroll: { flexGrow: 1, padding: 20, paddingTop: 40, paddingBottom: 60 },
   logoWrap: { alignItems: 'center', marginBottom: 24 },
   logoIcon: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   logoIconText: { fontSize: 24, color: '#fff' },

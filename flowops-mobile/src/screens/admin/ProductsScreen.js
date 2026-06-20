@@ -5,17 +5,28 @@ import {
 } from 'react-native';
 import { apiRequest } from '../../api/client';
 import { ENDPOINTS } from '../../config/config';
+import { useCurrency, USD_TO_INR } from '../../hooks/useCurrency';
+
+const CurrencyToggle = ({ currency, onToggle }) => (
+  <TouchableOpacity style={styles.currencyToggle} onPress={onToggle} activeOpacity={0.8}>
+    <Text style={[styles.currencyOption, currency === 'INR' && styles.currencyActive]}>₹ INR</Text>
+    <Text style={styles.currencySep}>|</Text>
+    <Text style={[styles.currencyOption, currency === 'USD' && styles.currencyActive]}>$ USD</Text>
+  </TouchableOpacity>
+);
 
 export default function ProductsScreen() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { currency, toggleCurrency, formatPrice } = useCurrency();
+
+  const [products, setProducts]   = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [desc, setDesc] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd]     = useState(false);
+  const [name, setName]           = useState('');
+  const [price, setPrice]         = useState('');
+  const [desc, setDesc]           = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [search, setSearch]       = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -29,12 +40,21 @@ export default function ProductsScreen() {
 
   const addProduct = async () => {
     if (!name.trim() || !price) { Alert.alert('Required', 'Name and price are required.'); return; }
-    if (isNaN(parseFloat(price)) || parseFloat(price) <= 0) { Alert.alert('Invalid', 'Enter a valid price.'); return; }
+    const rawPrice = parseFloat(price);
+    if (isNaN(rawPrice) || rawPrice <= 0) { Alert.alert('Invalid', 'Enter a valid price.'); return; }
     setSaving(true);
+    
+    // Always store in USD internally - convert if INR was entered
+    const priceInUSD = currency === 'INR' ? rawPrice / USD_TO_INR : rawPrice;
+    
     try {
       await apiRequest(ENDPOINTS.CREATE_PRODUCT, {
         method: 'POST',
-        body: { name: name.trim(), price: parseFloat(price), description: desc.trim() || undefined },
+        body: { 
+          name: name.trim(), 
+          price: parseFloat(priceInUSD.toFixed(4)), 
+          description: desc.trim() || undefined 
+        },
       });
       setShowAdd(false); setName(''); setPrice(''); setDesc('');
       load();
@@ -53,14 +73,21 @@ export default function ProductsScreen() {
         <Text style={styles.name}>{item.name}</Text>
         {item.description ? <Text style={styles.desc}>{item.description}</Text> : null}
       </View>
-      <Text style={styles.price}>${parseFloat(item.price || 0).toFixed(2)}</Text>
+      <Text style={styles.price}>{formatPrice(item.price)}</Text>
     </View>
   );
 
   return (
     <View style={styles.bg}>
       <View style={styles.toolbar}>
-        <TextInput style={styles.searchInput} placeholder="Search products..." placeholderTextColor="#94a3b8" value={search} onChangeText={setSearch} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search products..."
+          placeholderTextColor="#94a3b8"
+          value={search}
+          onChangeText={setSearch}
+        />
+        <CurrencyToggle currency={currency} onToggle={toggleCurrency} />
         <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
           <Text style={styles.addBtnText}>+ Add</Text>
         </TouchableOpacity>
@@ -82,10 +109,17 @@ export default function ProductsScreen() {
           <Text style={styles.modalTitle}>Add Product</Text>
           <Text style={styles.label}>Product Name *</Text>
           <TextInput style={styles.input} placeholder="e.g. Pro Plan" placeholderTextColor="#94a3b8" value={name} onChangeText={setName} />
-          <Text style={styles.label}>Price (USD) *</Text>
-          <TextInput style={styles.input} placeholder="e.g. 99.99" placeholderTextColor="#94a3b8" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
+          <Text style={styles.label}>Price ({currency}) *</Text>
+          <TextInput style={styles.input} placeholder={currency === 'INR' ? "e.g. 1999" : "e.g. 19.99"} placeholderTextColor="#94a3b8" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
           <Text style={styles.label}>Description (Optional)</Text>
-          <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} placeholder="Short description..." placeholderTextColor="#94a3b8" value={desc} onChangeText={setDesc} multiline />
+          <TextInput
+            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+            placeholder="Short description..."
+            placeholderTextColor="#94a3b8"
+            value={desc}
+            onChangeText={setDesc}
+            multiline
+          />
           <TouchableOpacity style={styles.btnPrimary} onPress={addProduct} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>Save Product</Text>}
           </TouchableOpacity>
@@ -100,10 +134,14 @@ export default function ProductsScreen() {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#f8fafc' },
-  toolbar: { flexDirection: 'row', gap: 10, padding: 14, paddingBottom: 8 },
-  searchInput: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 11, fontSize: 14, color: '#0f172a', borderWidth: 1, borderColor: '#e2e8f0' },
-  addBtn: { backgroundColor: '#4f46e5', borderRadius: 10, paddingHorizontal: 16, justifyContent: 'center' },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  toolbar: { flexDirection: 'row', gap: 8, padding: 14, paddingBottom: 8, alignItems: 'center' },
+  searchInput: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 11, fontSize: 13, color: '#0f172a', borderWidth: 1, borderColor: '#e2e8f0' },
+  currencyToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
+  currencyOption: { fontSize: 11, fontWeight: '600', color: '#94a3b8' },
+  currencyActive: { color: '#4f46e5', fontWeight: '800' },
+  currencySep: { color: '#cbd5e1', fontSize: 12 },
+  addBtn: { backgroundColor: '#4f46e5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, justifyContent: 'center' },
+  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   iconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' },
   icon: { fontSize: 20 },

@@ -39,7 +39,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.bg} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.bg} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <Text style={styles.title}>Reset Password</Text>
@@ -78,7 +78,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
+  scroll: { flexGrow: 1, padding: 20, paddingTop: 40, paddingBottom: 60 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   title: { fontSize: 22, fontWeight: '700', color: '#0f172a', marginBottom: 6 },
   subtitle: { fontSize: 14, color: '#64748b', marginBottom: 20 },

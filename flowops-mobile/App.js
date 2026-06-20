@@ -2,7 +2,12 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { AuthProvider } from './src/context/AuthContext';
+import { CurrencyProvider } from './src/context/CurrencyContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import { initGlobalErrorHandler, logError } from './src/utils/logger';
+
+// Initialize global error tracking
+initGlobalErrorHandler();
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 // Catches any crash and shows the error on screen instead of closing the app.
@@ -20,6 +25,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     this.setState({ error, errorInfo });
     console.error('APP CRASH:', error, errorInfo);
+    logError(error, 'AppCrash (ErrorBoundary)');
   }
 
   render() {
@@ -61,7 +67,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppNavigator />
+        <CurrencyProvider>
+          <AppNavigator />
+        </CurrencyProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
