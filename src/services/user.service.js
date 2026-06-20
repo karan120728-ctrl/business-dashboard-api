@@ -82,11 +82,11 @@ const createUser = async (userData) => {
     }
 };
 
-const loginUser = async (email, password) => {
     const [users] = await pool.query(`
-        SELECT u.*, b.business_code 
+        SELECT u.*, b.business_code, c.id as customer_id
         FROM users u 
         LEFT JOIN businesses b ON u.business_id = b.id 
+        LEFT JOIN customers c ON u.email = c.email AND u.business_id = c.business_id
         WHERE u.email = ?
     `, [email.trim().toLowerCase()]);
     
@@ -111,10 +111,10 @@ const loginUser = async (email, password) => {
             email: user.email, 
             role: user.role, 
             business_id: user.business_id,
-            business_code: user.business_code 
+            inviteCode: user.business_code,
+            customerId: user.customer_id
         }
     };
-};
 
 const forgotPassword = async (email) => {
     const [users] = await pool.query("SELECT id, name FROM users WHERE email = ?", [email.toLowerCase()]);

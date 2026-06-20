@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image,
-  Alert, ActivityIndicator, ScrollView,
+  Alert, ActivityIndicator, ScrollView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -69,7 +69,14 @@ export default function ProofScreen({ route, navigation }) {
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('proof_image', { uri: image.uri, type: image.type, name: image.name });
+      // Ensure the image URI is formatted correctly for the native bridge
+      const uri = Platform.OS === 'android' ? image.uri : image.uri.replace('file://', '');
+      
+      formData.append('proof_image', {
+        uri: uri,
+        name: image.name || `proof_${orderId}.jpg`,
+        type: 'image/jpeg',
+      });
       await apiUpload(ENDPOINTS.SUBMIT_POD(orderId), formData);
       setSubmitted(true);
     } catch (e) {

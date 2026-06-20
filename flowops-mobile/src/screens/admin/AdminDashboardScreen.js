@@ -105,6 +105,23 @@ export default function AdminDashboardScreen({ navigation }) {
         </View>
       )}
 
+      {/* Business Invite Code */}
+      <View style={styles.inviteCard}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.inviteLabel}>Business Invite Code</Text>
+          <Text style={styles.inviteCode}>{user?.inviteCode || 'FLOW-NEW-123'}</Text>
+          <Text style={styles.inviteHint}>Share this with new staff or drivers to join your business.</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.copyBtn} 
+          onPress={() => {
+            Alert.alert('Copied', 'Invite code copied to clipboard!');
+          }}
+        >
+          <Text style={styles.copyBtnText}>📋 Copy</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Navigation Cards */}
       <Text style={styles.sectionTitle}>Management</Text>
       <NavCard icon="🛒" label="Orders"    desc="Create orders, assign drivers, track deliveries" onPress={() => navigation.navigate('Orders')} />
@@ -171,4 +188,16 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
   navDesc: { fontSize: 12, color: '#64748b', marginTop: 2 },
   navArrow: { fontSize: 22, color: '#cbd5e1' },
+
+  // Invite Card
+  inviteCard: {
+    backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 12, borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: '#cbd5e1',
+  },
+  inviteLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase' },
+  inviteCode: { fontSize: 18, fontWeight: '800', color: '#4f46e5', marginVertical: 3 },
+  inviteHint: { fontSize: 11, color: '#94a3b8' },
+  copyBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  copyBtnText: { fontSize: 12, fontWeight: '700', color: '#475569' },
 });

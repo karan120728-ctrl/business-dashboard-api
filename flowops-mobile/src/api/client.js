@@ -50,16 +50,21 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(`${API_URL}${endpoint}`, config);
-    let data;
     try {
-      data = await response.json();
-    } catch (parseErr) {
       const text = await response.text();
-      const error = new Error(`JSON parse error. Status: ${response.status}`);
-      error.url = `${API_URL}${endpoint}`;
-      error.method = options.method || 'GET';
-      error.status = response.status;
-      error.responseBody = text;
+      try {
+        data = JSON.parse(text);
+      } catch (jsonErr) {
+        const error = new Error(`JSON parse error. Status: ${response.status}`);
+        error.url = `${API_URL}${endpoint}`;
+        error.method = options.method || 'GET';
+        error.status = response.status;
+        error.responseBody = text;
+        throw error;
+      }
+    } catch (parseErr) {
+      if (parseErr.url) throw parseErr;
+      const error = new Error(`Network/Parse error: ${parseErr.message}`);
       throw error;
     }
 
@@ -97,16 +102,21 @@ export const apiUpload = async (endpoint, formData) => {
       headers,
       body: formData,
     });
-    let data;
     try {
-      data = await response.json();
-    } catch (parseErr) {
       const text = await response.text();
-      const error = new Error(`JSON parse error. Status: ${response.status}`);
-      error.url = `${API_URL}${endpoint}`;
-      error.method = 'POST';
-      error.status = response.status;
-      error.responseBody = text;
+      try {
+        data = JSON.parse(text);
+      } catch (jsonErr) {
+        const error = new Error(`JSON parse error. Status: ${response.status}`);
+        error.url = `${API_URL}${endpoint}`;
+        error.method = 'POST';
+        error.status = response.status;
+        error.responseBody = text;
+        throw error;
+      }
+    } catch (parseErr) {
+      if (parseErr.url) throw parseErr;
+      const error = new Error(`Network/Parse error: ${parseErr.message}`);
       throw error;
     }
 

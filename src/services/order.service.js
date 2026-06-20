@@ -81,7 +81,10 @@ const getOrders = async (user) => {
     let queryStr = `
         SELECT o.*,
                c.name as customer_name, c.email as customer_email, c.phone as customer_phone, c.address as customer_address,
-               u.name as created_by_name
+               u.name as created_by_name,
+               (SELECT p.name FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = o.id LIMIT 1) as product_name,
+               (SELECT oi.quantity FROM order_items oi WHERE oi.order_id = o.id LIMIT 1) as quantity,
+               o.total_amount as total_price
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         JOIN users u ON o.created_by = u.id
@@ -90,7 +93,7 @@ const getOrders = async (user) => {
     const params = [businessId];
     
     if (user.role === "driver") {
-        queryStr += " AND o.driver_id = ?";
+        queryStr += " AND (o.driver_id = ? OR o.status = 'out_for_delivery')";
         params.push(user.id);
     } else if (user.role === "customer") {
         queryStr += " AND c.email = ?";
@@ -116,8 +119,14 @@ const getOrderLocation = async (orderId, businessId) => {
 };
 
 const updateOrderStatus = async (orderId, businessId, status, io) => {
-    const allowedStatus = Object.values(ORDER_STATUS);
-    if (!allowedStatus.includes(status)) throw new AppError("Invalid status", 400);
+    const [orderRows] = await pool.query("SELECT o.*, c.email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?", [orderId]);
+    if (orderRows.length === 0) throw new AppError("Order not found", 404);
+    const order = orderRows[0];
+
+    // 🔥 AUTOMATION: Generate Invoice when officially marked as DELIVERED
+    if (status === ORDER_STATUS.DELIVERED) {
+        await invoiceService.createInvoice(businessId, orderId, order.customer_id, order.total_amount);
+    }
 
     let query = "UPDATE orders SET status = ?";
     let params = [status];
@@ -130,15 +139,13 @@ const updateOrderStatus = async (orderId, businessId, status, io) => {
     params.push(orderId, businessId);
 
     const [result] = await pool.query(query, params);
-    if (result.affectedRows === 0) throw new AppError("Order not found", 404);
-
+    
     // Trigger Notification Event
-    const [orderRows] = await pool.query("SELECT o.*, c.email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?", [orderId]);
-    if (orderRows.length > 0) {
-        const order = orderRows[0];
-        const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
-        if (customerUserRows.length > 0) {
-            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Order Update", `Your order #${order.id} is now ${status.replace(/_/g, ' ')}!`);
+    const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
+    if (customerUserRows.length > 0) {
+        notificationService.createNotification(io, businessId, customerUserRows[0].id, "Order Update", `Your order #${order.id} is now ${status.replace(/_/g, ' ')}!`);
+        if (status === ORDER_STATUS.DELIVERED) {
+            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Invoice Generated 📄", `An invoice for order #${order.id} is now available.`);
         }
     }
 
@@ -176,7 +183,7 @@ const updateLocation = async (orderId, businessId, data) => {
 
 const submitProof = async (orderId, businessId, proofImage, io) => {
     const [result] = await pool.query(
-        "UPDATE orders SET proof_image_url = ?, status = 'delivered', delivered_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?",
+        "UPDATE orders SET proof_image_url = ? WHERE id = ? AND business_id = ?",
         [proofImage, orderId, businessId]
     );
     if (result.affectedRows === 0) throw new AppError("Order not found", 404);
@@ -185,14 +192,18 @@ const submitProof = async (orderId, businessId, proofImage, io) => {
     if (orderRows.length > 0) {
         const order = orderRows[0];
         
-        // Generate Invoice upon delivery
-        await invoiceService.createInvoice(businessId, orderId, order.customer_id, order.total_amount);
+        // NO AUTO-INVOICE OR STATUS CHANGE HERE. 
+        // We wait for Admin or Customer to Approve (update status to delivered).
 
         const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
         if (customerUserRows.length > 0) {
-            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Package Delivered! ✅", `Order #${order.id} has been successfully delivered. Thank you!`);
-            // Add a notification for the invoice too
-            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Invoice Generated 📄", `An invoice for your recent delivery (Order #${order.id}) has been generated.`);
+            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Delivery Proof Uploaded 📸", `Driver has uploaded proof for Order #${order.id}. Please review and confirm delivery.`);
+        }
+        
+        // Also notify Admin
+        const [busRows] = await pool.query("SELECT owner_id FROM businesses WHERE id = ?", [businessId]);
+        if (busRows.length > 0 && busRows[0].owner_id) {
+            notificationService.createNotification(io, businessId, busRows[0].owner_id, "Proof Received 📝", `Proof of delivery uploaded for Order #${orderId}.`);
         }
     }
 
