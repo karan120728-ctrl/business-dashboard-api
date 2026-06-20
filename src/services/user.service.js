@@ -82,6 +82,7 @@ const createUser = async (userData) => {
     }
 };
 
+const loginUser = async (email, password) => {
     const [users] = await pool.query(`
         SELECT u.*, b.business_code, c.id as customer_id
         FROM users u 
@@ -115,6 +116,7 @@ const createUser = async (userData) => {
             customerId: user.customer_id
         }
     };
+};
 
 const forgotPassword = async (email) => {
     const [users] = await pool.query("SELECT id, name FROM users WHERE email = ?", [email.toLowerCase()]);

@@ -90,6 +90,9 @@ export default function CustomerDashboardScreen({ navigation }) {
     ]);
   };
 
+  const renderOrder = ({ item }) => {
+    const color = STATUS_COLORS[item.status] || '#64748b';
+    const isActive = item.status === 'out_for_delivery';
     const isPendingProofApproval = item.status === 'out_for_delivery' && item.proof_image_url;
     
     return (
