@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert,
+  RefreshControl, ActivityIndicator, Alert, Modal, TextInput, ScrollView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api/client';
