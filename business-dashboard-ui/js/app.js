@@ -94,7 +94,7 @@ function setupUI() {
     const displayCode = document.getElementById('display-invite-code');
     if (inviteContainer && (role === 'admin' || role === 'superadmin')) {
         inviteContainer.classList.remove('hidden');
-        if (displayCode) displayCode.innerText = currentUser.business_code || '------';
+        if (displayCode) displayCode.innerText = currentUser.business_code || currentUser.inviteCode || currentUser.businessCode || '------';
     } else if (inviteContainer) {
         inviteContainer.classList.add('hidden');
     }
