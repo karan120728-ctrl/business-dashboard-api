@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "fe2ead3b-4a4b-4585-93bc-b2f462b960d1"
+      }
+    },
+    "android": {
+      "package": "com.karan2805.businessdashboardapi"
+    }
+  }
+}

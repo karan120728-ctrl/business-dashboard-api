@@ -52,8 +52,9 @@ export const apiRequest = async (endpoint, options = {}) => {
     const response = await fetch(`${API_URL}${endpoint}`, config);
     try {
       const text = await response.text();
+      let data;
       try {
-        data = JSON.parse(text);
+        data = text ? JSON.parse(text) : {};
       } catch (jsonErr) {
         const error = new Error(`JSON parse error. Status: ${response.status}`);
         error.url = `${API_URL}${endpoint}`;
@@ -62,22 +63,22 @@ export const apiRequest = async (endpoint, options = {}) => {
         error.responseBody = text;
         throw error;
       }
+
+      if (!response.ok) {
+        const error = new Error(data?.message || `Request failed: ${response.status}`);
+        error.url = `${API_URL}${endpoint}`;
+        error.method = options.method || 'GET';
+        error.status = response.status;
+        error.responseBody = data;
+        throw error;
+      }
+
+      return data;
     } catch (parseErr) {
       if (parseErr.url) throw parseErr;
       const error = new Error(`Network/Parse error: ${parseErr.message}`);
       throw error;
     }
-
-    if (!response.ok) {
-      const error = new Error(data?.message || `Request failed: ${response.status}`);
-      error.url = `${API_URL}${endpoint}`;
-      error.method = options.method || 'GET';
-      error.status = response.status;
-      error.responseBody = data;
-      throw error;
-    }
-
-    return data;
   } catch (error) {
     if (!error.url) {
       error.url = `${API_URL}${endpoint}`;
@@ -104,8 +105,9 @@ export const apiUpload = async (endpoint, formData) => {
     });
     try {
       const text = await response.text();
+      let data;
       try {
-        data = JSON.parse(text);
+        data = text ? JSON.parse(text) : {};
       } catch (jsonErr) {
         const error = new Error(`JSON parse error. Status: ${response.status}`);
         error.url = `${API_URL}${endpoint}`;
@@ -114,22 +116,22 @@ export const apiUpload = async (endpoint, formData) => {
         error.responseBody = text;
         throw error;
       }
+
+      if (!response.ok) {
+        const error = new Error(data?.message || 'Upload failed');
+        error.url = `${API_URL}${endpoint}`;
+        error.method = 'POST';
+        error.status = response.status;
+        error.responseBody = data;
+        throw error;
+      }
+
+      return data;
     } catch (parseErr) {
       if (parseErr.url) throw parseErr;
       const error = new Error(`Network/Parse error: ${parseErr.message}`);
       throw error;
     }
-
-    if (!response.ok) {
-      const error = new Error(data?.message || 'Upload failed');
-      error.url = `${API_URL}${endpoint}`;
-      error.method = 'POST';
-      error.status = response.status;
-      error.responseBody = data;
-      throw error;
-    }
-
-    return data;
   } catch (error) {
     if (!error.url) {
       error.url = `${API_URL}${endpoint}`;
