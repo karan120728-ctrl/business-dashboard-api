@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { apiRequest } from '../../api/client';
 import { ENDPOINTS } from '../../config/config';
+import { useAuth } from '../../context/AuthContext';
 
 export default function CustomersScreen() {
   const [customers, setCustomers] = useState([]);
@@ -17,15 +18,27 @@ export default function CustomersScreen() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
 
+  const { user } = useAuth();
+
   const load = useCallback(async () => {
+    if (!user?.business_id) return;
+    
+    setLoading(true);
     try {
       const res = await apiRequest(ENDPOINTS.CUSTOMERS);
       setCustomers(res.data || res.customers || res || []);
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { 
+      console.error('[Customers Load Error]', e);
+      if (customers.length === 0) Alert.alert('Error', e.message); 
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [user?.business_id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (user?.business_id) {
+       load();
+    }
+  }, [load, user?.business_id]);
 
   const addCustomer = async () => {
     if (!name.trim() || !email.trim()) { Alert.alert('Required', 'Name and email are required.'); return; }

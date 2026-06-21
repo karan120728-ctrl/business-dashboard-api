@@ -6,6 +6,7 @@ import {
 import { apiRequest } from '../../api/client';
 import { ENDPOINTS } from '../../config/config';
 import { useCurrency, USD_TO_INR } from '../../hooks/useCurrency';
+import { useAuth } from '../../context/AuthContext';
 
 const CurrencyToggle = ({ currency, onToggle }) => (
   <TouchableOpacity style={styles.currencyToggle} onPress={onToggle} activeOpacity={0.8}>
@@ -28,15 +29,27 @@ export default function ProductsScreen() {
   const [saving, setSaving]       = useState(false);
   const [search, setSearch]       = useState('');
 
+  const { user } = useAuth();
+
   const load = useCallback(async () => {
+    if (!user?.business_id) return;
+    
+    setLoading(true);
     try {
       const res = await apiRequest(ENDPOINTS.PRODUCTS);
       setProducts(res.data || res.products || res || []);
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { 
+      console.error('[Products Load Error]', e);
+      if (products.length === 0) Alert.alert('Error', e.message); 
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [user?.business_id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (user?.business_id) {
+       load();
+    }
+  }, [load, user?.business_id]);
 
   const addProduct = async () => {
     if (!name.trim() || !price) { Alert.alert('Required', 'Name and price are required.'); return; }

@@ -48,8 +48,16 @@ export const apiRequest = async (endpoint, options = {}) => {
     ...(options.body ? { body: JSON.stringify(options.body) } : {}),
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, config);
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...config,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
     try {
       const text = await response.text();
       let data;

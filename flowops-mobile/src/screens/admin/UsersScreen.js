@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { apiRequest } from '../../api/client';
 import { ENDPOINTS } from '../../config/config';
+import { useAuth } from '../../context/AuthContext';
 
 const ROLE_COLORS = { admin: '#4f46e5', superadmin: '#7c3aed', driver: '#f59e0b', customer: '#10b981' };
 
@@ -19,15 +20,27 @@ export default function UsersScreen() {
 
   const roles = ['customer', 'driver', 'admin', 'superadmin'];
 
+  const { user } = useAuth();
+
   const load = useCallback(async () => {
+    if (!user?.business_id) return;
+    
+    setLoading(true);
     try {
       const res = await apiRequest(ENDPOINTS.USERS);
       setUsers(res.data || res.users || res || []);
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { 
+      console.error('[Users Load Error]', e);
+      if (users.length === 0) Alert.alert('Error', e.message); 
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [user?.business_id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (user?.business_id) {
+       load();
+    }
+  }, [load, user?.business_id]);
 
   const updateRole = async () => {
     if (!newRole) { Alert.alert('Select a role'); return; }

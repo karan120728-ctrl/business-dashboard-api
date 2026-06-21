@@ -78,6 +78,9 @@ export default function OrdersScreen({ navigation }) {
 
   // ── Load data ────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
+    if (!user?.business_id) return; // DON'T FETCH IF NO BUSINESS ID
+    
+    setLoading(true);
     try {
       const [oRes, cRes, pRes, uRes] = await Promise.all([
         apiRequest(ENDPOINTS.ORDERS),
@@ -92,24 +95,36 @@ export default function OrdersScreen({ navigation }) {
       const allUsers = uRes.data || uRes.users || uRes || [];
       setDrivers(allUsers.filter(u => u.role === 'driver'));
     } catch (e) {
-      Alert.alert('Error', e.message);
+      console.error('[Orders Load Error]', e);
+      // Only alert if we're not already displaying data (to avoid noisy sync errors)
+      if (orders.length === 0) Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.business_id]); // RELOAD WHEN BUSINESS ID APPEARS
 
   useEffect(() => {
-    load();
+    if (user?.business_id) {
+      load();
+    }
     
     // 🔥 SOCKET.IO REAL-TIME UPDATES
     const socketUrl = API_URL.replace('/api', '');
-    const socket = io(socketUrl, { transports: ['websocket'] });
+    const socket = io(socketUrl, { 
+      transports: ['websocket'],
+      query: { business_id: user?.business_id }
+    });
 
     socket.on('connect', () => {
+      console.log('Admin Socket Connected');
       if (user?.business_id) {
         socket.emit('joinBusiness', user.business_id);
       }
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('Socket connect error:', err.message);
     });
 
     socket.on('newOrder', (newOrder) => {

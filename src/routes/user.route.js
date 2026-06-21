@@ -9,7 +9,7 @@ const roleCheck = require("../middlewares/role.middleware");
 router.post("/createUser", createUser);
 
 // Get all users
-router.get("/getUser", auth, getUser);
+router.get("/", auth, getUser);
 
 // Update user (Role/Active status)
 router.patch("/:id", auth, updateUser);
