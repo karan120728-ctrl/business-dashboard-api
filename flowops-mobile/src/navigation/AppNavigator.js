@@ -73,6 +73,7 @@ const AdminStack = () => (
     <Stack.Screen name="Products" component={ProductsScreen} options={{ title: 'Products' }} />
     <Stack.Screen name="Users" component={UsersScreen} options={{ title: 'Users' }} />
     <Stack.Screen name="Payments" component={PaymentsScreen} options={{ title: 'Payments' }} />
+    <Stack.Screen name="TrackOrder" component={TrackOrderScreen} options={{ title: 'Live Tracking' }} />
     <Stack.Screen name="DebugLogs" component={DebugLogsScreen} options={{ title: 'App Debug Logs' }} />
   </Stack.Navigator>
 );

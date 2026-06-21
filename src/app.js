@@ -89,6 +89,11 @@ io.on("connection", (socket) => {
     console.log(`User ${userId} joined their notification room.`);
   });
 
+  socket.on("joinBusiness", (businessId) => {
+    socket.join(`business_${businessId}`);
+    console.log(`Socket joined business room: business_${businessId}`);
+  });
+
   socket.on("joinOrder", (orderId) => {
     socket.join(`order_${orderId}`);
     console.log(`Client joined tracking room for Order #${orderId}`);

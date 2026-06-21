@@ -66,6 +66,16 @@ const createOrder = async (user, businessId, data, io) => {
             console.error("[Notification] Error dispatching new order notification:", nErr.message);
         }
 
+        // 🔥 REAL-TIME: Notify all admins in the business room
+        if (io) {
+            io.to(`business_${businessId}`).emit("newOrder", { 
+                id: orderId, 
+                customer_name: (await connection.query("SELECT name FROM customers WHERE id = ?", [customer]))[0][0]?.name,
+                total_amount: totalAmount,
+                status: 'pending'
+            });
+        }
+
         return { id: orderId, customer_id: customer, totalAmount, createdBy: userId };
     } catch (error) {
         await connection.rollback();
@@ -144,9 +154,14 @@ const updateOrderStatus = async (orderId, businessId, status, io) => {
     const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
     if (customerUserRows.length > 0) {
         notificationService.createNotification(io, businessId, customerUserRows[0].id, "Order Update", `Your order #${order.id} is now ${status.replace(/_/g, ' ')}!`);
-        if (status === ORDER_STATUS.DELIVERED) {
-            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Invoice Generated 📄", `An invoice for order #${order.id} is now available.`);
-        }
+    }
+
+    // 🔥 REAL-TIME: Notify rooms about status change
+    if (io) {
+        // Notify the specific order room (for tracking screen)
+        io.to(`order_${orderId}`).emit("statusUpdate", { orderId, status });
+        // Notify the business-wide room (for admin dashboard)
+        io.to(`business_${businessId}`).emit("orderStatusChanged", { orderId, status });
     }
 
     return { status };
@@ -163,6 +178,12 @@ const assignDriver = async (orderId, businessId, data, io) => {
 
     if (driver_id) {
         notificationService.createNotification(io, businessId, driver_id, "New Delivery Assigned 🚛", `You have been assigned order #${orderId}. Tap to start tracking!`);
+    }
+
+    // 🔥 REAL-TIME: Notifyrooms
+    if (io) {
+        io.to(`order_${orderId}`).emit("driverAssigned", { orderId, driver_name, vehicle_number, status: 'out_for_delivery' });
+        io.to(`business_${businessId}`).emit("orderStatusChanged", { orderId, status: 'out_for_delivery' });
     }
 
     return true;

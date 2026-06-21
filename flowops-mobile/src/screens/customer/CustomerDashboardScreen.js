@@ -9,6 +9,8 @@ import { ENDPOINTS } from '../../config/config';
 
 import { useCurrency } from '../../hooks/useCurrency';
 import * as ImagePicker from 'expo-image-picker';
+import io from 'socket.io-client';
+import { API_URL } from '../../config/config';
 
 const STATUS_COLORS = {
   pending: '#f59e0b', processing: '#6366f1',
@@ -41,7 +43,30 @@ export default function CustomerDashboardScreen({ navigation }) {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+
+    // 🔥 SOCKET.IO REAL-TIME UPDATES
+    const socketUrl = API_URL.replace('/api', '');
+    const socket = io(socketUrl, { transports: ['websocket'] });
+
+    socket.on('connect', () => {
+      if (user?.id) {
+        socket.emit('join', user.id);
+      }
+    });
+
+    socket.on('statusUpdate', ({ orderId, status }) => {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    });
+
+    socket.on('notification', () => {
+      // Refresh list if a notification arrives (optional, but good for sync)
+      load();
+    });
+
+    return () => socket.disconnect();
+  }, [load, user?.id]);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure?', [

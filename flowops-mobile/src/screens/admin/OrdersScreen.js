@@ -9,18 +9,21 @@ import { ENDPOINTS } from '../../config/config';
 import { useCurrency } from '../../hooks/useCurrency';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import io from 'socket.io-client';
+import { API_URL } from '../../config/config';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const ALL_STATUSES = [
   { key: 'pending',          label: 'Pending',          color: '#f59e0b', icon: '🕐' },
-  { key: 'processing',       label: 'Processing',       color: '#6366f1', icon: '⚙️' },
+  { key: 'confirmed',        label: 'Confirmed',        color: '#6366f1', icon: '⚙️' },
   { key: 'out_for_delivery', label: 'Out for Delivery', color: '#3b82f6', icon: '🚛' },
   { key: 'delivered',        label: 'Delivered',        color: '#10b981', icon: '✅' },
   { key: 'cancelled',        label: 'Cancelled',        color: '#ef4444', icon: '❌' },
 ];
 
 const STATUS_COLORS = {
-  pending: '#f59e0b', processing: '#6366f1', out_for_delivery: '#3b82f6',
+  pending: '#f59e0b', confirmed: '#6366f1', out_for_delivery: '#3b82f6',
   delivered: '#10b981', cancelled: '#ef4444',
 };
 
@@ -48,9 +51,12 @@ export default function OrdersScreen({ navigation }) {
   const [orders, setOrders]       = useState([]);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts]   = useState([]);
+  const [drivers, setDrivers]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch]       = useState('');
+
+  const { user } = useAuth();
 
   // Create order modal
   const [showCreate, setShowCreate] = useState(false);
@@ -64,17 +70,27 @@ export default function OrdersScreen({ navigation }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
+  // Assign driver modal
+  const [showAssign, setShowAssign] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [vehicleNum, setVehicleNum] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
   // ── Load data ────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
-      const [oRes, cRes, pRes] = await Promise.all([
+      const [oRes, cRes, pRes, uRes] = await Promise.all([
         apiRequest(ENDPOINTS.ORDERS),
         apiRequest(ENDPOINTS.CUSTOMERS),
         apiRequest(ENDPOINTS.PRODUCTS),
+        apiRequest(ENDPOINTS.USERS),
       ]);
       setOrders(oRes.data || oRes.orders || oRes || []);
       setCustomers(cRes.data || cRes.customers || cRes || []);
       setProducts(pRes.data || pRes.products || pRes || []);
+      
+      const allUsers = uRes.data || uRes.users || uRes || [];
+      setDrivers(allUsers.filter(u => u.role === 'driver'));
     } catch (e) {
       Alert.alert('Error', e.message);
     } finally {
@@ -83,7 +99,29 @@ export default function OrdersScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    
+    // 🔥 SOCKET.IO REAL-TIME UPDATES
+    const socketUrl = API_URL.replace('/api', '');
+    const socket = io(socketUrl, { transports: ['websocket'] });
+
+    socket.on('connect', () => {
+      if (user?.business_id) {
+        socket.emit('joinBusiness', user.business_id);
+      }
+    });
+
+    socket.on('newOrder', (newOrder) => {
+      setOrders(prev => [newOrder, ...prev]);
+    });
+
+    socket.on('orderStatusChanged', ({ orderId, status }) => {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    });
+
+    return () => socket.disconnect();
+  }, [load, user?.business_id]);
 
   // ── Create order ─────────────────────────────────────────────────────────────
   const createOrder = async () => {
@@ -103,6 +141,36 @@ export default function OrdersScreen({ navigation }) {
       Alert.alert('Error', e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Assign Driver ────────────────────────────────────────────────────────────
+  const openAssignModal = (order) => {
+    setSelectedOrder(order);
+    setShowAssign(true);
+  };
+
+  const handleAssignDriver = async () => {
+    if (!selectedDriver) { Alert.alert('Required', 'Select a driver'); return; }
+    setAssigning(true);
+    try {
+      await apiRequest(ENDPOINTS.ASSIGN_DRIVER(selectedOrder.id), {
+        method: 'POST',
+        body: {
+          driver_id: selectedDriver.id,
+          driver_name: selectedDriver.name,
+          vehicle_number: vehicleNum,
+        },
+      });
+      setShowAssign(false);
+      setSelectedDriver(null);
+      setVehicleNum('');
+      load();
+      Alert.alert('Success', 'Driver assigned and order is Out for Delivery!');
+    } catch (e) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -190,6 +258,18 @@ export default function OrdersScreen({ navigation }) {
   const applyStatus = async (newStatus) => {
     if (!selectedOrder) return;
 
+    // WORKFLOW REVERSAL PROTECTION
+    // Order: pending -> confirmed -> out_for_delivery -> delivered
+    const statusWeight = { pending: 0, confirmed: 1, out_for_delivery: 2, delivered: 3, cancelled: 4 };
+    const currentWeight = statusWeight[selectedOrder.status] || 0;
+    const newWeight = statusWeight[newStatus] || 0;
+
+    // Only lock AFTER delivered/cancelled (as per user feedback for flexibility before final approval)
+    if (currentWeight >= 3 && newStatus !== 'cancelled') {
+        Alert.alert('Restricted', 'This order is already delivered and cannot be changed.');
+        return;
+    }
+
     if (newStatus === 'delivered') {
       Alert.alert(
         'Confirm Delivery',
@@ -211,6 +291,12 @@ export default function OrdersScreen({ navigation }) {
         { cancelable: true }
       );
       return;
+    }
+
+    if (newStatus === 'out_for_delivery') {
+        setStatusModal(false);
+        openAssignModal(selectedOrder);
+        return;
     }
 
     setUpdatingStatus(true);
@@ -248,16 +334,39 @@ export default function OrdersScreen({ navigation }) {
       <Text style={styles.cardText}>📦 {item.product_name || '—'} × {item.quantity}</Text>
       <Text style={styles.cardText}>💰 {formatPrice(item.total_price || 0)}</Text>
       {item.driver_name && <Text style={styles.cardText}>🚛 {item.driver_name}</Text>}
-      {/* Status change button */}
-      <TouchableOpacity
-        style={[styles.statusBtn, { borderColor: STATUS_COLORS[item.status] || '#6366f1' }]}
-        onPress={() => openStatusModal(item)}
-        activeOpacity={0.75}
-      >
-        <Text style={[styles.statusBtnText, { color: STATUS_COLORS[item.status] || '#6366f1' }]}>
-          🔄  Change Status
-        </Text>
-      </TouchableOpacity>
+      
+      <View style={styles.cardActions}>
+        {/* Change Status Button */}
+        <TouchableOpacity
+          style={[styles.statusBtn, { borderColor: STATUS_COLORS[item.status] || '#6366f1' }]}
+          onPress={() => openStatusModal(item)}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.statusBtnText, { color: STATUS_COLORS[item.status] || '#6366f1' }]}>
+            🔄  {item.status === 'pending' ? 'Confirm Order' : 'Change Status'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Assign Driver Button (Visible if Confirmed) */}
+        {item.status === 'confirmed' && (
+          <TouchableOpacity
+            style={[styles.statusBtn, { borderColor: '#3b82f6', marginLeft: 8, backgroundColor: '#eff6ff' }]}
+            onPress={() => openAssignModal(item)}
+          >
+            <Text style={[styles.statusBtnText, { color: '#3b82f6' }]}>🚛 Assign Driver</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Live Track Button (Visible if Out for Delivery) */}
+        {item.status === 'out_for_delivery' && (
+          <TouchableOpacity
+            style={[styles.statusBtn, { borderColor: '#10b981', marginLeft: 8, backgroundColor: '#f0fdf4' }]}
+            onPress={() => navigation.navigate('TrackOrder', { orderId: item.id })}
+          >
+            <Text style={[styles.statusBtnText, { color: '#10b981' }]}>📍 Live Track</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 
@@ -366,6 +475,55 @@ export default function OrdersScreen({ navigation }) {
         </TouchableOpacity>
       </Modal>
 
+      {/* ── ASSIGN DRIVER MODAL ────────────────────────────────────────────── */}
+      <Modal visible={showAssign} animationType="slide" presentationStyle="formSheet">
+        <View style={styles.createModal}>
+           <ScrollView contentContainerStyle={{ padding: 24 }}>
+            <Text style={styles.modalTitle}>Assign Courier</Text>
+            <Text style={styles.sheetSub}>Select an available driver for Order #{selectedOrder?.id}</Text>
+
+            <Text style={styles.label}>Choose Driver</Text>
+            <View style={styles.pickerWrap}>
+              {drivers.length === 0 ? (
+                <Text style={styles.empty}>No drivers registered in your company.</Text>
+              ) : (
+                drivers.map(d => (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={[styles.pickItem, selectedDriver?.id === d.id && styles.pickItemActive]}
+                    onPress={() => setSelectedDriver(d)}
+                  >
+                    <Text style={[styles.pickText, selectedDriver?.id === d.id && { color: '#fff' }]}>
+                      👤 {d.name} ({d.email})
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+
+            <Text style={styles.label}>Vehicle Number (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. DL-01-AB-1234"
+              value={vehicleNum}
+              onChangeText={setVehicleNum}
+            />
+
+            <TouchableOpacity
+              style={[styles.btnPrimary, { marginTop: 32 }]}
+              onPress={handleAssignDriver}
+              disabled={assigning || !selectedDriver}
+            >
+              {assigning ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>Dispatch Order</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.btnCancel} onPress={() => setShowAssign(false)}>
+              <Text style={styles.btnCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* ── CREATE ORDER MODAL ──────────────────────────────────────────────── */}
       <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
         <ScrollView style={styles.createModal} contentContainerStyle={{ padding: 24 }}>
@@ -450,11 +608,12 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   badgeText: { fontSize: 10, fontWeight: '700' },
   cardText: { fontSize: 13, color: '#475569', marginTop: 3 },
+  cardActions: { flexDirection: 'row', marginTop: 12 },
   statusBtn: {
-    marginTop: 12, borderRadius: 8, borderWidth: 1.5,
+    flex: 1, borderRadius: 8, borderWidth: 1.5,
     paddingVertical: 8, alignItems: 'center',
   },
-  statusBtnText: { fontSize: 13, fontWeight: '700' },
+  statusBtnText: { fontSize: 12, fontWeight: '700' },
 
   // Status modal
   modalOverlay: {
