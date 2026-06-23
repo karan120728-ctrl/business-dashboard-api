@@ -213,18 +213,18 @@ const submitProof = async (orderId, businessId, proofImage, io) => {
     if (orderRows.length > 0) {
         const order = orderRows[0];
         
-        // NO AUTO-INVOICE OR STATUS CHANGE HERE. 
-        // We wait for Admin or Customer to Approve (update status to delivered).
+        // 🚀 AUTOMATION: Auto-update status to Delivered (triggering Invoice generation)
+        await updateOrderStatus(orderId, businessId, ORDER_STATUS.DELIVERED, io);
 
         const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
         if (customerUserRows.length > 0) {
-            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Delivery Proof Uploaded 📸", `Driver has uploaded proof for Order #${order.id}. Please review and confirm delivery.`);
+            notificationService.createNotification(io, businessId, customerUserRows[0].id, "Order Delivered! 📦", `Your order #${order.id} has been securely delivered. You can view the proof of delivery in your dashboard.`);
         }
         
         // Also notify Admin
         const [busRows] = await pool.query("SELECT owner_id FROM businesses WHERE id = ?", [businessId]);
         if (busRows.length > 0 && busRows[0].owner_id) {
-            notificationService.createNotification(io, businessId, busRows[0].owner_id, "Proof Received 📝", `Proof of delivery uploaded for Order #${orderId}.`);
+            notificationService.createNotification(io, businessId, busRows[0].owner_id, "Delivery Completed ✅", `Order #${orderId} was successfully delivered and an invoice was generated.`);
         }
     }
 
