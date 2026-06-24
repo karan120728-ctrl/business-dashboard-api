@@ -870,7 +870,10 @@ async function loadPayments() {
             return `<tr>
                 <td>#${i.id}</td>
                 <td>${i.customer_name} <br><small class="text-muted">${i.customer_email}</small></td>
-                <td><a href="#" onclick="switchView('orders'); return false;">#${i.order_id}</a></td>
+                <td>
+                    <a href="#" onclick="switchView('orders'); return false;">#${i.order_id}</a>
+                    <br><small class="text-muted" style="font-weight:500;">${i.product_details || 'N/A'}</small>
+                </td>
                 <td>${formatCurrency(i.amount)}</td>
                 <td>${formatDate(i.due_date)}</td>
                 <td><span class="badge badge-${pBadgeClass}">${i.status.toUpperCase()}</span></td>

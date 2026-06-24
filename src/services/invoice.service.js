@@ -32,7 +32,11 @@ class InvoiceService {
 
     async getInvoices(business_id) {
         const [rows] = await pool.query(
-            `SELECT i.*, o.total_amount, c.name as customer_name, c.email as customer_email 
+            `SELECT i.*, o.total_amount, c.name as customer_name, c.email as customer_email,
+             (SELECT GROUP_CONCAT(CONCAT(p.name, ' (x', oi.quantity, ')') SEPARATOR ', ')
+              FROM order_items oi
+              JOIN products p ON oi.product_id = p.id
+              WHERE oi.order_id = i.order_id) AS product_details
              FROM invoices i
              JOIN orders o ON i.order_id = o.id
              JOIN customers c ON i.customer_id = c.id
