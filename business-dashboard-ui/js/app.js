@@ -1943,28 +1943,32 @@ async function openBatchDetail(id) {
         listEl.innerHTML = orders.map(o => {
             const isDelivered = o.status === 'delivered';
             return `
-                <div style="background: ${isDelivered ? 'rgba(16, 185, 129, 0.03)' : 'white'}; border: 1px solid ${isDelivered ? '#10b981' : '#e5e7eb'}; padding: 1.25rem; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-                    <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                <div style="background: ${isDelivered ? 'rgba(16, 185, 129, 0.03)' : 'white'}; border: 1px solid ${isDelivered ? '#10b981' : '#e5e7eb'}; padding: 1.25rem; border-radius: 12px; display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; align-items: flex-start; gap: 1rem;">
                         <div style="width: 40px; height: 40px; background: ${isDelivered ? '#10b981' : '#f3f4f6'}; color: ${isDelivered ? '#fff' : '#6b7280'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
                             ${isDelivered ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-house"></i>'}
                         </div>
-                                <h4 style="margin: 0; font-size: 1rem;">${o.customer_name}</h4>
-                                <p style="margin: 0.1rem 0 0; font-size: 0.85rem; color: var(--text-muted);">
-                                    <i class="fa-solid fa-location-dot"></i> 
-                                    ${o.current_address || o.delivery_location || o.customer_address || 'Address not set'}
-                                </p>
-                                ${o.customer_phone ? `<p style="margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--primary);"><i class="fa-solid fa-phone"></i> ${o.customer_phone}</p>` : ''}
-                            </div>
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0; font-size: 1rem; color: var(--text-main);">${o.customer_name}</h4>
+                            <p style="margin: 0.25rem 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+                                <i class="fa-solid fa-location-dot" style="width: 15px;"></i> 
+                                ${o.current_address || o.delivery_location || o.customer_address || 'Address not set'}
+                            </p>
+                            ${o.customer_phone ? `<p style="margin: 0; font-size: 0.8rem; color: var(--primary); font-weight: 500;"><i class="fa-solid fa-phone" style="width: 15px;"></i> ${o.customer_phone}</p>` : ''}
+                        </div>
+                        ${isDelivered ? '<div style="background: #10b981; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Done</div>' : ''}
                     </div>
-                    <div>
-                        ${isDelivered ? 
-                            '<span style="color: #10b981; font-weight: 600; font-size: 0.85rem;"><i class="fa-solid fa-circle-check"></i> Delivered</span>' : 
-                            `<div style="display: flex; gap: 0.5rem;">
-                                <button class="btn btn-neutral btn-sm" onclick="openDriverTracking(${o.id})"><i class="fa-solid fa-location-crosshairs"></i> GPS</button>
-                                <button class="btn btn-success btn-sm" onclick="handleMarkDeliveredInBatch(${o.id}, ${id})"><i class="fa-solid fa-camera"></i> Delivered</button>
-                            </div>`
-                        }
+                    
+                    ${!isDelivered ? `
+                    <div style="display: flex; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px dashed #e5e7eb;">
+                        <button class="btn btn-neutral" style="flex: 1; justify-content: center;" onclick="openDriverTracking(${o.id})">
+                            <i class="fa-solid fa-location-crosshairs"></i> GPS
+                        </button>
+                        <button class="btn btn-success" style="flex: 1; justify-content: center;" onclick="handleMarkDeliveredInBatch(${o.id}, ${id})">
+                            <i class="fa-solid fa-camera"></i> Delivered
+                        </button>
                     </div>
+                    ` : ''}
                 </div>
             `;
         }).join('');
