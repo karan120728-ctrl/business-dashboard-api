@@ -57,9 +57,9 @@ function setupUI() {
         }
     });
 
-    // Handle elements that should be hidden ONLY for drivers
+    // Handle elements that should be hidden for drivers AND customers (admin/superadmin only)
     document.querySelectorAll('.driver-hidden').forEach(el => {
-        if (role === 'driver') {
+        if (role === 'driver' || role === 'customer') {
             el.classList.add('hidden');
         } else {
             el.classList.remove('hidden');
@@ -911,25 +911,29 @@ async function loadOrders() {
             if (o.payment_status === 'paid') pBadgeClass = 'success';
             if (o.payment_status === 'overdue') pBadgeClass = 'danger';
 
-            const checkboxHtml = isStaff ? `<td class="driver-hidden"><input type="checkbox" class="order-batch-cb" value="${o.id}" data-status="${o.status}" ${o.status !== 'pending' && o.status !== 'confirmed' ? 'disabled' : ''}></td>` : '';
+            const isCustomer = currentUser.role === 'customer';
+            const checkboxHtml = isStaff ? `<td class="driver-hidden admin-only"><input type="checkbox" class="order-batch-cb" value="${o.id}" data-status="${o.status}" ${o.status !== 'pending' && o.status !== 'confirmed' ? 'disabled' : ''}></td>` : '';
+            
+            // Clean status label with proper casing for all users
+            const statusLabel = o.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
             return `<tr>
                 ${checkboxHtml}
                 <td>#${o.id}</td>
-                <td>${o.customer_name}</td>
+                ${isCustomer ? '' : `<td class="admin-only">${o.customer_name}</td>`}
                 <td>${formatCurrency(o.total_amount)}</td>
-                <td>${o.batch_id ? `<span class="badge badge-neutral" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;">Route #${o.batch_id}</span>` : '<span style="color:#d1d5db; font-size:0.8rem;">Single</span>'}</td>
+                ${isCustomer ? '' : `<td class="admin-only">${o.batch_id ? `<span class="badge badge-neutral" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;">Route #${o.batch_id}</span>` : '<span style="color:#d1d5db; font-size:0.8rem;">Single</span>'}</td>`}
                 <td>${formatDate(o.created_at)}</td>
-                <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${o.status.toUpperCase()}</span></td>
+                <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${statusLabel}</span></td>
                 <td><span class="badge badge-${pBadgeClass}">${(o.payment_status || 'unpaid').toUpperCase()}</span></td>
-                <td>
+                ${isCustomer ? '' : `<td>
                     <select class="input" onchange="updateOrderStatus(${o.id}, this.value, ${o.driver_id || 'null'}, '${o.status}')" ${!isStaff || o.status === 'delivered' ? 'disabled' : ''}>
                         <option value="pending" ${o.status === 'pending' ? 'selected' : ''} ${o.status !== 'pending' ? 'disabled' : ''}>Pending</option>
                         <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''} ${o.status === 'out_for_delivery' ? 'disabled' : ''}>Confirmed</option>
                         <option value="out_for_delivery" ${o.status === 'out_for_delivery' ? 'selected' : ''}>Out for Delivery</option>
                         <option value="delivered" ${o.status === 'delivered' ? 'selected' : ''}>Delivered</option>
                     </select>
-                </td>
+                </td>`}
                 <td class="table-actions">${actions}</td>
             </tr>`;
         }).join('');
