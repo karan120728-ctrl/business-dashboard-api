@@ -2,57 +2,110 @@ const { pool } = require("../db/connection");
 const AppError = require("../utils/AppError");
 
 const getDashboardData = async (businessId) => {
-    // Basic aggregation for Total Revenue
-    const [totalRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid'", [businessId]);
+
+    // -----------------------------------------------------------------
+    // REVENUE METRICS — based on delivered_at (when $ was actually earned)
+    // -----------------------------------------------------------------
+
+    // All-time total collected (paid invoices)
+    const [totalRes] = await pool.query(
+        "SELECT SUM(amount) as sum FROM invoices WHERE business_id = ? AND status = 'paid'",
+        [businessId]
+    );
     const totalRevenue = totalRes[0].sum || 0;
 
-    // --- TODAY REVENUE & GROWTH ---
-    const [todayRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid' AND DATE(created_at) = CURDATE()", [businessId]);
+    // --- TODAY ---
+    const [todayRes] = await pool.query(
+        "SELECT SUM(o.total_amount) as sum FROM orders o WHERE o.business_id = ? AND o.payment_status = 'paid' AND DATE(o.delivered_at) = CURDATE()",
+        [businessId]
+    );
     const todayRevenue = todayRes[0].sum || 0;
 
-    const [yesterdayRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid' AND DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)", [businessId]);
+    const [yesterdayRes] = await pool.query(
+        "SELECT SUM(o.total_amount) as sum FROM orders o WHERE o.business_id = ? AND o.payment_status = 'paid' AND DATE(o.delivered_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)",
+        [businessId]
+    );
     const yesterdayRevenue = yesterdayRes[0].sum || 0;
     const todayGrowth = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : 0;
 
-    // --- WEEKLY REVENUE & GROWTH ---
-    const [weekRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid' AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)", [businessId]);
+    // --- WEEKLY ---
+    const [weekRes] = await pool.query(
+        "SELECT SUM(o.total_amount) as sum FROM orders o WHERE o.business_id = ? AND o.payment_status = 'paid' AND YEARWEEK(o.delivered_at, 1) = YEARWEEK(CURDATE(), 1)",
+        [businessId]
+    );
     const weeklyRevenue = weekRes[0].sum || 0;
 
-    const [prevWeekRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid' AND YEARWEEK(created_at, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)", [businessId]);
+    const [prevWeekRes] = await pool.query(
+        "SELECT SUM(o.total_amount) as sum FROM orders o WHERE o.business_id = ? AND o.payment_status = 'paid' AND YEARWEEK(o.delivered_at, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)",
+        [businessId]
+    );
     const prevWeeklyRevenue = prevWeekRes[0].sum || 0;
     const weeklyGrowth = prevWeeklyRevenue > 0 ? ((weeklyRevenue - prevWeeklyRevenue) / prevWeeklyRevenue) * 100 : 0;
 
-    // --- MONTHLY REVENUE & GROWTH ---
-    const [monthRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid' AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())", [businessId]);
+    // --- MONTHLY ---
+    const [monthRes] = await pool.query(
+        "SELECT SUM(o.total_amount) as sum FROM orders o WHERE o.business_id = ? AND o.payment_status = 'paid' AND MONTH(o.delivered_at) = MONTH(CURDATE()) AND YEAR(o.delivered_at) = YEAR(CURDATE())",
+        [businessId]
+    );
     const monthlyRevenue = monthRes[0].sum || 0;
 
-    const [prevMonthRes] = await pool.query("SELECT SUM(total_amount) as sum FROM orders WHERE business_id = ? AND payment_status = 'paid' AND MONTH(created_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(CURDATE())", [businessId]);
+    const [prevMonthRes] = await pool.query(
+        "SELECT SUM(o.total_amount) as sum FROM orders o WHERE o.business_id = ? AND o.payment_status = 'paid' AND MONTH(o.delivered_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(o.delivered_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))",
+        [businessId]
+    );
     const prevMonthlyRevenue = prevMonthRes[0].sum || 0;
     const monthlyGrowth = prevMonthlyRevenue > 0 ? ((monthlyRevenue - prevMonthlyRevenue) / prevMonthlyRevenue) * 100 : 0;
 
-    // Status distribution
-    const [statusData] = await pool.query("SELECT status, COUNT(*) as count FROM orders WHERE business_id = ? GROUP BY status", [businessId]);
+    // -----------------------------------------------------------------
+    // ORDER STATUS DISTRIBUTION (for donut chart)
+    // -----------------------------------------------------------------
+    const [statusData] = await pool.query(
+        "SELECT status, COUNT(*) as count FROM orders WHERE business_id = ? GROUP BY status",
+        [businessId]
+    );
 
-    // Outstanding Amount
-    const [outstandingRes] = await pool.query("SELECT SUM(amount) as sum FROM invoices WHERE business_id = ? AND status IN ('unpaid', 'overdue')", [businessId]);
+    // -----------------------------------------------------------------
+    // OUTSTANDING AMOUNT — from invoices (unpaid + overdue)
+    // -----------------------------------------------------------------
+    const [outstandingRes] = await pool.query(
+        "SELECT SUM(amount) as sum FROM invoices WHERE business_id = ? AND status IN ('unpaid', 'overdue')",
+        [businessId]
+    );
     const outstandingAmount = outstandingRes[0].sum || 0;
 
-    // Monthly sales chart data
-    const [monthlySalesData] = await pool.query(`
-        SELECT DATE_FORMAT(created_at, '%Y-%m-%d') as label, SUM(total_amount) as sales 
-        FROM orders 
-        WHERE business_id = ? AND payment_status = 'paid' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+    // -----------------------------------------------------------------
+    // CHARTS
+    // -----------------------------------------------------------------
+
+    // Daily chart: Revenue per hour today
+    const [todaySalesData] = await pool.query(`
+        SELECT DATE_FORMAT(o.delivered_at, '%H:00') as label, SUM(o.total_amount) as sales
+        FROM orders o
+        WHERE o.business_id = ? AND o.payment_status = 'paid' AND DATE(o.delivered_at) = CURDATE()
+        GROUP BY DATE_FORMAT(o.delivered_at, '%H:00')
         ORDER BY label ASC
     `, [businessId]);
 
-    // Today's hourly data
-    const [todaySalesData] = await pool.query(`
-        SELECT DATE_FORMAT(created_at, '%H:00') as label, SUM(total_amount) as sales
-        FROM orders
-        WHERE business_id = ? AND payment_status = 'paid' AND DATE(created_at) = CURDATE()
-        GROUP BY DATE_FORMAT(created_at, '%H:00')
-        ORDER BY label ASC
+    // Weekly chart: Revenue per day this week (Mon–Sun)
+    const [weeklySalesData] = await pool.query(`
+        SELECT DATE_FORMAT(o.delivered_at, '%a %d %b') as label, SUM(o.total_amount) as sales
+        FROM orders o
+        WHERE o.business_id = ?
+          AND o.payment_status = 'paid'
+          AND YEARWEEK(o.delivered_at, 1) = YEARWEEK(CURDATE(), 1)
+        GROUP BY DATE(o.delivered_at)
+        ORDER BY DATE(o.delivered_at) ASC
+    `, [businessId]);
+
+    // Monthly chart: Revenue per day over last 30 days
+    const [monthlySalesData] = await pool.query(`
+        SELECT DATE_FORMAT(o.delivered_at, '%d %b') as label, SUM(o.total_amount) as sales
+        FROM orders o
+        WHERE o.business_id = ?
+          AND o.payment_status = 'paid'
+          AND o.delivered_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(o.delivered_at)
+        ORDER BY DATE(o.delivered_at) ASC
     `, [businessId]);
 
     return {
@@ -67,7 +120,7 @@ const getDashboardData = async (businessId) => {
         charts: {
             sales: {
                 today: todaySalesData,
-                weekly: [],
+                weekly: weeklySalesData,
                 monthly: monthlySalesData
             },
             statusWise: statusData
