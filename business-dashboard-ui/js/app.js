@@ -1948,11 +1948,13 @@ async function openBatchDetail(id) {
                         <div style="width: 40px; height: 40px; background: ${isDelivered ? '#10b981' : '#f3f4f6'}; color: ${isDelivered ? '#fff' : '#6b7280'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
                             ${isDelivered ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-house"></i>'}
                         </div>
-                        <div>
-                            <h4 style="margin: 0; font-size: 1rem;">${o.customer_name}</h4>
-                            <p style="margin: 0.1rem 0 0; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-location-dot"></i> ${o.current_address || o.delivery_location || 'Address not set'}</p>
-                            ${o.customer_phone ? `<p style="margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--primary);"><i class="fa-solid fa-phone"></i> ${o.customer_phone}</p>` : ''}
-                        </div>
+                                <h4 style="margin: 0; font-size: 1rem;">${o.customer_name}</h4>
+                                <p style="margin: 0.1rem 0 0; font-size: 0.85rem; color: var(--text-muted);">
+                                    <i class="fa-solid fa-location-dot"></i> 
+                                    ${o.current_address || o.delivery_location || o.customer_address || 'Address not set'}
+                                </p>
+                                ${o.customer_phone ? `<p style="margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--primary);"><i class="fa-solid fa-phone"></i> ${o.customer_phone}</p>` : ''}
+                            </div>
                     </div>
                     <div>
                         ${isDelivered ? 

@@ -66,7 +66,8 @@ const getDriverBatches = async (driverId, businessId) => {
 const getBatchDetails = async (batchId, businessId) => {
     // Get the orders inside the batch
     const [orders] = await pool.query(`
-        SELECT o.id, o.customer_id, o.status, o.delivery_location, o.current_address, c.name as customer_name, c.phone as customer_phone
+        SELECT o.id, o.customer_id, o.status, o.delivery_location, o.current_address, 
+               c.name as customer_name, c.phone as customer_phone, c.address as customer_address
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         WHERE o.batch_id = ? AND o.business_id = ?
