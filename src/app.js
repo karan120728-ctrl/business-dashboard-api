@@ -297,6 +297,9 @@ app.use("/api/notifications", notificationRoute);
 const invoiceRoute = require("./routes/invoice.route");
 app.use("/api/invoices", invoiceRoute);
 
+const batchRoute = require("./routes/batch.route");
+app.use("/api/batches", batchRoute);
+
 const dashboardRoute = require("./routes/dashboard.route");
 app.use("/api", dashboardRoute);
 
