@@ -74,39 +74,57 @@ const getDashboardData = async (businessId) => {
     const outstandingAmount = outstandingRes[0].sum || 0;
 
     // -----------------------------------------------------------------
-    // CHARTS
+    // CHARTS — with full date ranges (fill gaps with 0)
     // -----------------------------------------------------------------
 
-    // Daily chart: Revenue per hour today
-    const [todaySalesData] = await pool.query(`
-        SELECT DATE_FORMAT(o.delivered_at, '%H:00') as label, SUM(o.total_amount) as sales
+    // Helper: format a Date object to 'DD Mon' e.g. '23 Jun'
+    const fmtDay = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    const fmtHour = (h) => `${String(h).padStart(2, '0')}:00`;
+    const toYMD = (d) => d.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+    // --- DAILY CHART: each hour 00-23 of today ---
+    const [todaySalesRaw] = await pool.query(`
+        SELECT DATE_FORMAT(o.delivered_at, '%H') as hr, SUM(o.total_amount) as sales
         FROM orders o
         WHERE o.business_id = ? AND o.payment_status = 'paid' AND DATE(o.delivered_at) = CURDATE()
-        GROUP BY DATE_FORMAT(o.delivered_at, '%H:00')
-        ORDER BY DATE_FORMAT(o.delivered_at, '%H:00') ASC
+        GROUP BY DATE_FORMAT(o.delivered_at, '%H')
     `, [businessId]);
+    const todayMap = {};
+    todaySalesRaw.forEach(r => { todayMap[r.hr] = parseFloat(r.sales); });
+    const todaySalesData = Array.from({ length: 24 }, (_, h) => ({
+        label: fmtHour(h),
+        sales: todayMap[String(h).padStart(2, '0')] || 0
+    }));
 
-    // Weekly chart: Revenue per day this week (Mon–Sun)
-    const [weeklySalesData] = await pool.query(`
-        SELECT DATE(o.delivered_at) as label, SUM(o.total_amount) as sales
+    // --- WEEKLY CHART: last 7 days (rolling week) ---
+    const [weeklySalesRaw] = await pool.query(`
+        SELECT DATE(o.delivered_at) as day, SUM(o.total_amount) as sales
         FROM orders o
-        WHERE o.business_id = ?
-          AND o.payment_status = 'paid'
-          AND YEARWEEK(o.delivered_at, 1) = YEARWEEK(CURDATE(), 1)
+        WHERE o.business_id = ? AND o.payment_status = 'paid'
+          AND o.delivered_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
         GROUP BY DATE(o.delivered_at)
-        ORDER BY DATE(o.delivered_at) ASC
     `, [businessId]);
+    const weeklyMap = {};
+    weeklySalesRaw.forEach(r => { weeklyMap[toYMD(new Date(r.day))] = parseFloat(r.sales); });
+    const weeklySalesData = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (6 - i));
+        return { label: fmtDay(d), sales: weeklyMap[toYMD(d)] || 0 };
+    });
 
-    // Monthly chart: Revenue per day over last 30 days
-    const [monthlySalesData] = await pool.query(`
-        SELECT DATE(o.delivered_at) as label, SUM(o.total_amount) as sales
+    // --- MONTHLY CHART: last 30 days ---
+    const [monthlySalesRaw] = await pool.query(`
+        SELECT DATE(o.delivered_at) as day, SUM(o.total_amount) as sales
         FROM orders o
-        WHERE o.business_id = ?
-          AND o.payment_status = 'paid'
-          AND o.delivered_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        WHERE o.business_id = ? AND o.payment_status = 'paid'
+          AND o.delivered_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
         GROUP BY DATE(o.delivered_at)
-        ORDER BY DATE(o.delivered_at) ASC
     `, [businessId]);
+    const monthlyMap = {};
+    monthlySalesRaw.forEach(r => { monthlyMap[toYMD(new Date(r.day))] = parseFloat(r.sales); });
+    const monthlySalesData = Array.from({ length: 30 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (29 - i));
+        return { label: fmtDay(d), sales: monthlyMap[toYMD(d)] || 0 };
+    });
 
     return {
         totalRevenue,
