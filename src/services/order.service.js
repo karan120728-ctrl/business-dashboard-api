@@ -180,6 +180,28 @@ const updateOrderStatus = async (orderId, businessId, status, io) => {
     params.push(orderId, businessId);
 
     const [result] = await pool.query(query, params);
+
+    // 🚚 BATCH COMPLETION CHECK: If this order was part of a batch, check if the whole route is finished
+    if (status === ORDER_STATUS.DELIVERED && order.batch_id) {
+        const [remainingOrders] = await pool.query(
+            "SELECT id FROM orders WHERE batch_id = ? AND status != ?",
+            [order.batch_id, ORDER_STATUS.DELIVERED]
+        );
+        
+        // If no orders left in this batch that aren't delivered
+        if (remainingOrders.length === 0) {
+            await pool.query(
+                "UPDATE delivery_batches SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [order.batch_id]
+            );
+            if (io) {
+                io.to(`business_${businessId}`).emit("orderStatusChanged", { 
+                    batchId: order.batch_id, 
+                    type: 'batch_completed' 
+                });
+            }
+        }
+    }
     
     // Trigger Notification Event
     const [customerUserRows] = await pool.query("SELECT id FROM users WHERE email = ? AND role = 'customer' AND business_id = ?", [order.email, businessId]);
