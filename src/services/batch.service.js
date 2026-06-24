@@ -60,6 +60,15 @@ const getDriverBatches = async (driverId, businessId) => {
         WHERE b.driver_id = ? AND b.business_id = ?
         ORDER BY b.created_at DESC
     `, [driverId, businessId]);
+
+    // 🔥 SELF-HEALING: Auto-fix any batches that were delivered before the trigger was added
+    for (const batch of batches) {
+        if (batch.total_orders > 0 && batch.total_orders === batch.completed_orders && batch.status !== 'completed') {
+            await pool.query("UPDATE delivery_batches SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?", [batch.id]);
+            batch.status = 'completed'; // Update local object for immediate UI response
+        }
+    }
+
     return batches;
 };
 
