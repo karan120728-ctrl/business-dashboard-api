@@ -1032,13 +1032,23 @@ async function handleOpenBatchModal() {
     if (checked.length === 0) return showToast("Select at least one order", "error");
     
     try {
-        const res = await window.UsersAPI.getAll();
-        const drivers = (res.users || []).filter(u => u.role === 'driver');
+        const users = await window.UsersAPI.getAll();
+        const drivers = (Array.isArray(users) ? users : (users.users || [])).filter(u => u.role === 'driver');
         const sel = document.getElementById('batch-driver');
+        
         sel.innerHTML = '<option value="">Select Driver...</option>' + 
-            drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+            drivers.map(d => {
+                const busyCount = parseInt(d.active_orders || 0);
+                const statusText = busyCount > 0 ? ` (Busy: ${busyCount} stops)` : ' (Available)';
+                const color = busyCount > 0 ? '#f59e0b' : '#1bbf72';
+                return `<option value="${d.id}" style="color: ${color}; font-weight: 500;">${d.name}${statusText}</option>`;
+            }).join('');
+            
         openModal('modal-batch');
-    } catch(e) { showToast("Failed to load drivers", "error"); }
+    } catch(e) { 
+        console.error("Load Drivers Error:", e);
+        showToast("Failed to load drivers", "error"); 
+    }
 }
 
 async function handleAssignBatch(e) {
@@ -1355,8 +1365,17 @@ window.openImagePreview = (src, caption) => {
 window.openAssignDriver = async (id) => {
     document.getElementById('assign-driver-order-id').value = id;
     const users = await window.UsersAPI.getAll();
+    const drivers = (Array.isArray(users) ? users : (users.users || [])).filter(u => u.role === 'driver');
     const sel = document.getElementById('driver-selection');
-    sel.innerHTML = '<option value="">Select Driver...</option>' + users.filter(u => u.role === 'driver').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    
+    sel.innerHTML = '<option value="">Select Driver...</option>' + 
+        drivers.map(d => {
+            const busyCount = parseInt(d.active_orders || 0);
+            const statusText = busyCount > 0 ? ` (Busy: ${busyCount} active)` : ' (Available)';
+            const color = busyCount > 0 ? '#f59e0b' : '#1bbf72';
+            return `<option value="${d.id}" style="color: ${color}; font-weight: 500;">${d.name}${statusText}</option>`;
+        }).join('');
+    
     openModal('assign-driver-modal');
 };
 

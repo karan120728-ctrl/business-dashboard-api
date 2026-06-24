@@ -162,7 +162,9 @@ const resetPassword = async (otp, email, newPassword) => {
 
 const getAllUsers = async (businessId) => {
     const [users] = await pool.query(
-        "SELECT id, business_id, name, email, role, is_active, created_at FROM users WHERE business_id = ? AND role != 'superadmin'",
+        `SELECT id, business_id, name, email, role, is_active, created_at,
+                (SELECT COUNT(*) FROM orders WHERE driver_id = users.id AND status = 'out_for_delivery') as active_orders
+         FROM users WHERE business_id = ? AND role != 'superadmin'`,
         [businessId]
     );
     return users;
