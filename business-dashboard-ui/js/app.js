@@ -634,7 +634,7 @@ async function handleUpdateStock(e) {
 
     setBtnLoading('btn-submit-stock', true, 'Save Inventory');
     try {
-        await window.API.put(\`/products/\${id}\`, updates);
+        await window.API.put(`/products/${id}`, updates);
         showToast("Inventory Updated!");
         closeModal('modal-stock');
         loadInventory();
