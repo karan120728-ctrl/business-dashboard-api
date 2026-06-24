@@ -58,6 +58,8 @@ const initDB = async () => {
         business_id INT NOT NULL,
         name VARCHAR(255) NOT NULL,
         price DECIMAL(10, 2) NOT NULL,
+        stock_quantity INT NOT NULL DEFAULT 0,
+        unit_size VARCHAR(50) NULL,
         description TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -76,6 +78,7 @@ const initDB = async () => {
         status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending',
         payment_status ENUM('unpaid', 'paid', 'overdue') DEFAULT 'unpaid',
         driver_id INT NULL,
+        batch_id INT NULL,
         driver_name VARCHAR(255),
         vehicle_number VARCHAR(100),
         delivery_location VARCHAR(255),
@@ -107,7 +110,21 @@ const initDB = async () => {
       )
     `);
 
-    // 6. Notifications Table (Isolated)
+    // 6. Delivery Batches Table (NEW)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS delivery_batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        business_id INT NOT NULL,
+        driver_id INT NOT NULL,
+        status ENUM('pending', 'active', 'completed') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP NULL,
+        FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+        FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // 7. Notifications Table (Isolated)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS notifications (
         id INT AUTO_INCREMENT PRIMARY KEY,

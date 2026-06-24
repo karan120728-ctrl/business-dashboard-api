@@ -21,14 +21,25 @@ const createOrder = async (user, businessId, data, io) => {
         await connection.beginTransaction();
         
         let totalAmount = 0;
+        let outOfStockItems = [];
+
         for (let item of products) {
             const [productRows] = await connection.query(
-                "SELECT price FROM products WHERE id = ? AND business_id = ?", 
+                "SELECT name, price, stock_quantity FROM products WHERE id = ? AND business_id = ? FOR UPDATE", 
                 [item.product, businessId]
             );
             if (productRows.length === 0) {
                 throw new AppError("Product not found in your business", 404);
             }
+            
+            // Deduct Stock
+            await connection.query("UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?", [item.quantity, item.product]);
+            
+            // Check Out of Stock Trigger
+            if (productRows[0].stock_quantity - item.quantity < 0) {
+                outOfStockItems.push(productRows[0].name);
+            }
+            
             totalAmount += productRows[0].price * item.quantity;
         }
 
@@ -46,6 +57,26 @@ const createOrder = async (user, businessId, data, io) => {
         }
 
         await connection.commit();
+
+        // 🔥 Out of Stock Automations
+        if (outOfStockItems.length > 0) {
+            // If the user placing it is the customer (from mobile app), warn them
+            if (user.role === 'customer') {
+                io.to(`user_${user.id}`).emit('out_of_stock_warning', {
+                    title: "Delivery Delayed ⚠️",
+                    message: `You ordered ${outOfStockItems.join(', ')} which is currently out of stock. Your delivery will be delayed.`,
+                    orderId: orderId
+                });
+                await notificationService.createNotification(io, businessId, user.id, "Delivery Delayed", `Your order includes items that are out of stock. Delivery will be delayed.`, 'info');
+            } else {
+                // If the user placing it is the admin, warn the admin internally
+                io.to(`user_${userId}`).emit('notification', {
+                    title: "Negative Stock Warning 🔴",
+                    message: `You just promised ${outOfStockItems.join(', ')} to a customer, but you have zero stock left!`,
+                    orderId: orderId
+                });
+            }
+        }
 
         // 🔥 Notify Admin about the new order
         try {

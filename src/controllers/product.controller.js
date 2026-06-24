@@ -4,13 +4,13 @@ const AppError = require("../utils/AppError");
 
 const createProduct = async (req, res) => {
     try {
-        const { name, price, description } = req.body;
+        const { name, price, description, stock_quantity, unit_size } = req.body;
 
         if (!name || price === undefined) {
             throw new AppError("Name and price are required", 400);
         }
 
-        const product = await productService.createProduct(req.user.business_id, { name, price, description });
+        const product = await productService.createProduct(req.user.business_id, { name, price, description, stock_quantity, unit_size });
         return sendSuccess(res, 201, { product }, "Product created successfully");
     } catch (error) {
         return sendError(res, error);
@@ -36,7 +36,16 @@ const deleteProduct = async (req, res) => {
     }
 };
 
-const updateProduct = async (req, res) => res.status(501).json({ message: "Not implemented" });
+const updateProduct = async (req, res) => {
+    try {
+        const { price, stock_quantity, unit_size } = req.body;
+        await productService.updateProductDetails(req.params.id, req.user.business_id, { price, stock_quantity, unit_size });
+        return sendSuccess(res, 200, null, "Product updated successfully");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
 const restoreProduct = async (req, res) => res.status(501).json({ message: "Not implemented" });
 
 module.exports = { createProduct, getProducts, deleteProduct, updateProduct, restoreProduct };

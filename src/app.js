@@ -62,6 +62,26 @@ connectDB().then(async () => {
     try { await pool.query("ALTER TABLE invoices ADD COLUMN paid_at DATETIME NULL"); } catch(e){}
     try { await pool.query("ALTER TABLE users ADD COLUMN push_token VARCHAR(255) NULL"); } catch(e){}
     
+    // 🔥 INVENTORY & ROUTING PHASE 2 MIGRATIONS
+    try { await pool.query("ALTER TABLE products ADD COLUMN stock_quantity INT NOT NULL DEFAULT 0"); } catch(e){}
+    try { await pool.query("ALTER TABLE products ADD COLUMN unit_size VARCHAR(50) NULL"); } catch(e){}
+    try { await pool.query("ALTER TABLE orders ADD COLUMN batch_id INT NULL"); } catch(e){}
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS delivery_batches (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                business_id INT NOT NULL,
+                driver_id INT NOT NULL,
+                status ENUM('pending', 'active', 'completed') DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP NULL,
+                FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+                FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+    } catch(e) {}
+    try { await pool.query("ALTER TABLE orders ADD CONSTRAINT fk_order_batch FOREIGN KEY (batch_id) REFERENCES delivery_batches(id) ON DELETE SET NULL"); } catch(e){}
+    
     // 🔥 CRITICAL FIX: Ensure audit table exists directly on startup
     await pool.query(`
       CREATE TABLE IF NOT EXISTS payment_audit_logs (
