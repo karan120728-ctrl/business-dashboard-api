@@ -66,6 +66,15 @@ function setupUI() {
         }
     });
 
+    // Handle elements that should be shown ONLY for drivers
+    document.querySelectorAll('.driver-only').forEach(el => {
+        if (role === 'driver') {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+
     // Sidebar Branding based on Role
     const sidebarTitle = document.querySelector('.sidebar-header h2');
     const sidebarTagline = document.querySelector('.sidebar-tagline');
@@ -245,6 +254,7 @@ function switchView(viewName) {
     if (viewName === 'orders') loadOrders();
     if (viewName === 'payments') loadPayments();
     if (viewName === 'users') loadUsers();
+    if (viewName === 'batches') loadBatches();
 }
 
 /* ================= RBX DASHBOARDS ================= */
@@ -1800,4 +1810,163 @@ function showConfirmModal(title, onConfirm, onCancel, message, confirmLabel, can
         modal.classList.add('hidden');
         if (onCancel) onCancel();
     });
+}
+
+/* ================= BATCHES & ROUTES (DRIVERS) ================= */
+async function loadBatches() {
+    const list = document.getElementById('batches-list');
+    const stats = document.getElementById('driver-batch-stats');
+    if (!list || !stats) return;
+
+    try {
+        const batches = await window.BatchesAPI.getDriverBatches();
+        
+        // Render Stats
+        const total = batches.length;
+        const pending = batches.filter(b => b.status !== 'completed').length;
+        const completed = batches.filter(b => b.status === 'completed').length;
+        
+        stats.innerHTML = `
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(79, 70, 229, 0.1); color: var(--primary);"><i class="fa-solid fa-truck-ramp-box"></i></div>
+                <div class="metric-data">
+                    <h3>Total Routes</h3>
+                    <p>${total}</p>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div class="metric-data">
+                    <h3>Active Runs</h3>
+                    <p>${pending}</p>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="metric-data">
+                    <h3>Finished</h3>
+                    <p>${completed}</p>
+                </div>
+            </div>
+        `;
+
+        if (batches.length === 0) {
+            list.innerHTML = '<div style="grid-column: 1/-1; padding: 3rem; text-align: center; background: white; border-radius: 12px; border: 1px dashed var(--border-color); color: var(--text-muted);"><i class="fa-solid fa-route" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i> No routes assigned yet.</div>';
+            return;
+        }
+
+        list.innerHTML = batches.map(b => {
+            const progress = b.total_orders > 0 ? Math.round((b.completed_orders / b.total_orders) * 100) : 0;
+            const isCompleted = b.status === 'completed' || (b.total_orders > 0 && b.completed_orders === b.total_orders);
+
+            return `
+                <div class="card" style="padding: 1.5rem; transition: transform 0.2s ease; border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
+                        <div>
+                            <h3 style="margin-bottom: 0.25rem;">Route #${b.id}</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-muted);">${formatDate(b.created_at)}</p>
+                        </div>
+                        <span class="badge badge-${isCompleted ? 'success' : 'primary'}">${(b.status || 'PENDING').toUpperCase()}</span>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-muted);">
+                            <span>Progress</span>
+                            <span>${b.completed_orders} / ${b.total_orders} Stops</span>
+                        </div>
+                        <div style="height: 6px; background: rgba(0,0,0,0.05); border-radius: 3px; overflow: hidden;">
+                            <div style="width: ${progress}%; height: 100%; background: var(--primary);"></div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-block" onclick="openBatchDetail(${b.id})">
+                        <i class="fa-solid fa-list-check"></i> ${isCompleted ? 'View Details' : 'Continue Deliveries'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+    } catch (e) {
+        console.error(e);
+        showToast("Error loading routes", "error");
+    }
+}
+
+async function openBatchDetail(id) {
+    try {
+        const orders = await window.BatchesAPI.getBatchDetails(id);
+        const modal = document.getElementById('modal-batch-detail');
+        const titleEl = document.getElementById('batch-detail-title');
+        const subtitleEl = document.getElementById('batch-detail-subtitle');
+        const listEl = document.getElementById('batch-orders-list');
+        const progressText = document.getElementById('batch-progress-text');
+        const progressBar = document.getElementById('batch-progress-bar');
+        const stopsLeftEl = document.getElementById('batch-stops-left');
+
+        titleEl.innerText = `Route #${id}`;
+        subtitleEl.innerText = `${orders.length} Stops Assigned`;
+
+        const total = orders.length;
+        const completed = orders.filter(o => o.status === 'delivered').length;
+        const progress = Math.round((completed / total) * 100);
+
+        progressText.innerText = `${progress}%`;
+        progressBar.style.width = `${progress}%`;
+        stopsLeftEl.innerText = (total - completed) || '0';
+
+        listEl.innerHTML = orders.map(o => {
+            const isDelivered = o.status === 'delivered';
+            return `
+                <div style="background: ${isDelivered ? 'rgba(16, 185, 129, 0.03)' : 'white'}; border: 1px solid ${isDelivered ? '#10b981' : '#e5e7eb'}; padding: 1.25rem; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                        <div style="width: 40px; height: 40px; background: ${isDelivered ? '#10b981' : '#f3f4f6'}; color: ${isDelivered ? '#fff' : '#6b7280'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+                            ${isDelivered ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-house"></i>'}
+                        </div>
+                        <div>
+                            <h4 style="margin: 0; font-size: 1rem;">${o.customer_name}</h4>
+                            <p style="margin: 0.1rem 0 0; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-location-dot"></i> ${o.current_address || o.delivery_location || 'Address not set'}</p>
+                            ${o.customer_phone ? `<p style="margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--primary);"><i class="fa-solid fa-phone"></i> ${o.customer_phone}</p>` : ''}
+                        </div>
+                    </div>
+                    <div>
+                        ${isDelivered ? 
+                            '<span style="color: #10b981; font-weight: 600; font-size: 0.85rem;"><i class="fa-solid fa-circle-check"></i> Delivered</span>' : 
+                            `<div style="display: flex; gap: 0.5rem;">
+                                <button class="btn btn-neutral btn-sm" onclick="openDriverTracking(${o.id})"><i class="fa-solid fa-location-crosshairs"></i> GPS</button>
+                                <button class="btn btn-success btn-sm" onclick="handleMarkDeliveredInBatch(${o.id}, ${id})"><i class="fa-solid fa-camera"></i> Delivered</button>
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        openModal('modal-batch-detail');
+    } catch (e) {
+        console.error(e);
+        showToast("Error loading route details", "error");
+    }
+}
+
+async function handleMarkDeliveredInBatch(orderId, batchId) {
+    // We reuse the existing submit proof flow
+    openSubmitProof(orderId);
+    
+    // We need to listen for when the proof is submitted to refresh the batch view
+    const originalSubmitProof = window.handleSubmitProof;
+    window.handleSubmitProof = async (e) => {
+        const success = await originalSubmitProof(e);
+        if (success !== false) { // Assuming success if not explicitly false
+             openBatchDetail(batchId);
+             loadBatches();
+        }
+    };
+}
+
+// Ensure BatchesAPI exists
+if (!window.BatchesAPI) {
+    window.BatchesAPI = {
+        getDriverBatches: () => Api.get('/batches/driver'),
+        getBatchDetails: (id) => Api.get(`/batches/${id}`)
+    };
 }
