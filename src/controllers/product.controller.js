@@ -39,7 +39,8 @@ const deleteProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
     try {
         const { price, stock_quantity, unit_size } = req.body;
-        await productService.updateProductDetails(req.params.id, req.user.business_id, { price, stock_quantity, unit_size });
+        const io = req.app.get('io');
+        await productService.updateProductDetails(req.params.id, req.user.business_id, { price, stock_quantity, unit_size }, io);
         return sendSuccess(res, 200, null, "Product updated successfully");
     } catch (error) {
         return sendError(res, error);

@@ -626,7 +626,12 @@ async function loadInventory() {
 
 window.openStockModal = (id, price, stock, unit) => {
     document.getElementById('stock-product-id').value = id;
-    document.getElementById('stock-price').value = price;
+    
+    // 🔥 DYNAMIC CURRENCY: Show price in INR if activeCurrency is INR
+    const displayPrice = activeCurrency === 'INR' ? Math.round(price * LIVE_INR_RATE) : price;
+    document.getElementById('stock-price').value = displayPrice;
+    document.getElementById('stock-currency-label').innerText = `(${activeCurrency})`;
+
     document.getElementById('stock-quantity').value = stock;
     document.getElementById('stock-unit').value = unit || '';
     openModal('modal-stock');
@@ -635,9 +640,14 @@ window.openStockModal = (id, price, stock, unit) => {
 async function handleUpdateStock(e) {
     e.preventDefault();
     const id = document.getElementById('stock-product-id').value;
-    const price = parseFloat(document.getElementById('stock-price').value);
+    let price = parseFloat(document.getElementById('stock-price').value);
     const stock_quantity = parseInt(document.getElementById('stock-quantity').value);
     const unit_size = document.getElementById('stock-unit').value;
+
+    // 🔥 DYNAMIC SAVE: Convert back to USD if the Admin typed it in INR
+    if (activeCurrency === 'INR' && !isNaN(price)) {
+        price = price / LIVE_INR_RATE;
+    }
 
     const updates = { stock_quantity, unit_size };
     if (!isNaN(price)) updates.price = price;
