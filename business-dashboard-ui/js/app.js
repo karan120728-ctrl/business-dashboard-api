@@ -729,11 +729,16 @@ async function openOrderModal() {
             const price = parseFloat(opt.getAttribute('data-price') || 0);
             const stock = parseInt(opt.getAttribute('data-stock') ?? -1);
             const qty = parseInt(document.getElementById('order-qty').value || 1);
+            
+            console.log(`[OrderPreview] Product: ${opt.text}, Stock: ${stock}, Requested: ${qty}`);
+            
             document.getElementById('order-total-preview').innerText = formatCurrency(price * qty);
 
             const hint = document.getElementById('stock-availability-hint');
             const warningBox = document.getElementById('order-stock-warning');
             const warningMsg = document.getElementById('order-stock-warning-msg');
+
+            if (!hint || !warningBox || !warningMsg) return;
 
             if (pSel.value && stock >= 0) {
                 // Show availability hint
@@ -780,10 +785,14 @@ async function handleCreateOrder(e) {
     if (!customerId || !productId) return showToast("Select customer and product", "error");
 
     // Pre-flight stock check — warn BEFORE placing the order
-    const stock = parseInt(pSel.options[pSel.selectedIndex].getAttribute('data-stock') ?? -1);
+    const selectedOpt = pSel.options[pSel.selectedIndex];
+    const stock = parseInt(selectedOpt.getAttribute('data-stock') ?? -1);
+    
+    console.log(`[CreateOrder] Final Check - Product: ${selectedOpt.text}, Stock: ${stock}, Requested: ${qty}`);
+
     if (stock >= 0 && qty > stock) {
         const shortage = qty - stock;
-        const productName = pSel.options[pSel.selectedIndex].text.split(' (')[0];
+        const productName = selectedOpt.text.split(' (')[0];
         const confirmed = await new Promise(resolve => {
             showConfirmModal(
                 `⚠️ Stock Shortage: ${productName}`,
@@ -794,6 +803,8 @@ async function handleCreateOrder(e) {
                 'Cancel'
             );
         });
+        
+        console.log(`[CreateOrder] Confirmation result: ${confirmed}`);
         if (!confirmed) return;
     }
 
