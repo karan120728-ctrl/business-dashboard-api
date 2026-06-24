@@ -1404,7 +1404,7 @@ async function handleAddUser(e) {
     if(!data.name || !data.email || !data.password) return showToast("Missing fields", "error");
     setBtnLoading('btn-submit-user', true, 'Save User');
     try { 
-        await window.Api.post('/users/createUser', data); 
+        await window.API.post('/users/createUser', data); 
         showToast("User Added!"); 
         closeModal('modal-user'); 
         loadUsers(); 
@@ -1418,7 +1418,7 @@ async function handleUpdateUserRole(e) {
     const role = document.getElementById('edit-user-role').value;
     setBtnLoading('btn-update-user', true, 'Save Changes');
     try { 
-        await window.Api.patch(`/users/${id}`, { role }); 
+        await window.API.patch(`/users/${id}`, { role }); 
         showToast("Role Updated!"); 
         closeModal('modal-edit-user'); 
         loadUsers(); 
@@ -1469,8 +1469,8 @@ function initNotifications() {
     if (clearBtn) {
         clearBtn.onclick = async () => {
             try {
-                await window.Api.patch('/notifications/read-all');
-                notifications.forEach(n => n.is_read = 1);
+                await window.API.delete('/notifications/clear-all');
+                notifications = [];
                 renderNotifications();
             } catch(e) {}
         };
@@ -1479,7 +1479,7 @@ function initNotifications() {
 
 async function loadNotificationHistory() {
     try {
-        const data = await window.Api.get('/notifications');
+        const data = await window.API.get('/notifications');
         notifications = data || [];
         renderNotifications();
     } catch(e) { console.error("Failed to load notifications", e); }
@@ -1525,7 +1525,7 @@ function markNotificationsAsRead() {
     // Mark all as read locally so renderNotifications() doesn't bring the badge back
     notifications.forEach(n => n.is_read = 1);
     // Also persist to server silently
-    try { window.Api.patch('/notifications/read-all'); } catch(e) {}
+    try { window.API.patch('/notifications/read-all'); } catch(e) {}
 }
 
 function playNotificationSound() {
