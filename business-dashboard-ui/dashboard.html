@@ -90,6 +90,53 @@
         </div>
     </div>
 
+    <!-- Update Stock Modal -->
+    <div id="modal-stock" class="modal hidden modal-form">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manage Inventory</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-stock">
+                <input type="hidden" id="stock-product-id">
+                <div class="form-group">
+                    <label>Update Price <span class="text-muted">(Optional)</span></label>
+                    <input type="number" id="stock-price" class="input" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Current Stock Quantity</label>
+                    <input type="number" id="stock-quantity" class="input" required>
+                </div>
+                <div class="form-group">
+                    <label>Unit Size (e.g. '1 Litre', '500g')</label>
+                    <input type="text" id="stock-unit" class="input">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-stock">Save Inventory</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assign Batch Modal -->
+    <div id="modal-batch" class="modal hidden modal-form">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Assign Orders to Driver (Batch)</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-batch">
+                <div class="form-group">
+                    <label>Select Driver</label>
+                    <select id="batch-driver" class="input" required></select>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-batch">Send Route to Driver</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Create Order Modal -->
     <div id="modal-order" class="modal hidden modal-form">
         <div class="modal-content wide">
@@ -216,6 +263,7 @@
             <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-view="dashboard" id="dashboard-link"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
                 <a href="#" class="nav-link" data-view="customers" id="customers-link"><i class="fa-solid fa-users"></i> Customers</a>
+                <a href="#" class="nav-link" data-view="inventory" id="inventory-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
                 <a href="#" class="nav-link" data-view="products" id="products-link"><i class="fa-solid fa-box"></i> Products</a>
                 <a href="#" class="nav-link" data-view="orders" id="orders-link"><i class="fa-solid fa-shopping-cart"></i> Orders</a>
                 <a href="#" class="nav-link admin-only hidden" data-view="payments" id="payments-link"><i class="fa-solid fa-file-invoice-dollar"></i> Payments</a>
@@ -394,15 +442,39 @@
                     </div>
                 </section>
 
+                <!-- Inventory View -->
+                <section id="view-inventory" class="view hidden">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Unit Size</th>
+                                    <th>Stock Quantity</th>
+                                    <th>Current Price</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
                 <!-- Orders View -->
                 <section id="view-orders" class="view hidden">
-                    <div class="toolbar">
-                        <button class="btn btn-primary driver-hidden" id="btn-create-order"><i class="fa-solid fa-plus"></i> Create Order</button>
+                    <div class="toolbar" style="display:flex; justify-content:space-between;">
+                        <div>
+                            <button class="btn btn-primary driver-hidden" id="btn-create-order"><i class="fa-solid fa-plus"></i> Create Order</button>
+                        </div>
+                        <div id="batch-actions" class="hidden">
+                            <button class="btn btn-primary" id="btn-create-batch"><i class="fa-solid fa-truck-fast"></i> Assign Selected to Batch</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th class="driver-hidden"><input type="checkbox" id="selectAllOrders" /></th>
                                     <th>ID</th>
                                     <th>Customer</th>
                                     <th>Amount</th>

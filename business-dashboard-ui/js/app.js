@@ -240,6 +240,7 @@ function switchView(viewName) {
     }
     
     if (viewName === 'customers') loadCustomers();
+    if (viewName === 'inventory') loadInventory();
     if (viewName === 'products') loadProducts();
     if (viewName === 'orders') loadOrders();
     if (viewName === 'payments') loadPayments();
@@ -328,6 +329,7 @@ function initModals() {
     bind('btn-add-product', () => openModal('modal-product'));
     bind('btn-create-order', openOrderModal);
     bind('btn-add-user', () => openModal('modal-user'));
+    bind('btn-create-batch', handleOpenBatchModal);
     bind('btn-start-camera', startCameraStream);
     bind('btn-capture-photo', capturePhoto);
     bind('btn-start-tracking', startGpsTracking);
@@ -350,7 +352,9 @@ function initModals() {
     const bindForm = (id, fn) => { const el = document.getElementById(id); if(el) el.onsubmit = fn; };
     bindForm('form-customer', handleAddCustomer);
     bindForm('form-product', handleAddProduct);
+    bindForm('form-stock', handleUpdateStock);
     bindForm('form-order', handleCreateOrder);
+    bindForm('form-batch', handleAssignBatch);
     bindForm('form-user', handleAddUser);
     bindForm('form-edit-user', handleUpdateUserRole);
     bindForm('assign-driver-form', handleAssignDriver);
@@ -584,6 +588,61 @@ window.deleteProduct = (id) => showConfirmModal("Delete product?", async () => {
     try { await window.ProductsAPI.delete(id); loadProducts(); } catch(e) {}
 });
 
+/* ================= INVENTORY LOGIC ================= */
+async function loadInventory() {
+    const tbody = document.getElementById('inventory-tbody');
+    if (!tbody) return;
+    try {
+        const res = await window.ProductsAPI.getAll(); 
+        const items = res.products || [];
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No inventory yet. Add a product first!</td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(p => {
+            const stockColor = p.stock_quantity <= 0 ? 'color: var(--danger); font-weight: bold;' 
+                             : (p.stock_quantity < 10 ? 'color: var(--warning); font-weight: bold;' : '');
+            return `
+            <tr>
+                <td><strong>${p.name}</strong></td>
+                <td>${p.unit_size || '-'}</td>
+                <td style="${stockColor}">${p.stock_quantity} remaining</td>
+                <td>${formatCurrency(p.price)}</td>
+                <td><button class="btn btn-secondary btn-sm" onclick="openStockModal(${p.id}, ${p.price}, ${p.stock_quantity}, '${p.unit_size || ''}')"><i class="fa-solid fa-boxes-packing"></i> Manage Stock</button></td>
+            </tr>
+        `}).join('');
+    } catch(e) { console.error('loadInventory error:', e); }
+}
+
+window.openStockModal = (id, price, stock, unit) => {
+    document.getElementById('stock-product-id').value = id;
+    document.getElementById('stock-price').value = price;
+    document.getElementById('stock-quantity').value = stock;
+    document.getElementById('stock-unit').value = unit || '';
+    openModal('modal-stock');
+};
+
+async function handleUpdateStock(e) {
+    e.preventDefault();
+    const id = document.getElementById('stock-product-id').value;
+    const price = parseFloat(document.getElementById('stock-price').value);
+    const stock_quantity = parseInt(document.getElementById('stock-quantity').value);
+    const unit_size = document.getElementById('stock-unit').value;
+
+    const updates = { stock_quantity, unit_size };
+    if (!isNaN(price)) updates.price = price;
+
+    setBtnLoading('btn-submit-stock', true, 'Save Inventory');
+    try {
+        await window.API.put(\`/products/\${id}\`, updates);
+        showToast("Inventory Updated!");
+        closeModal('modal-stock');
+        loadInventory();
+        if(!document.getElementById('view-products').classList.contains('hidden')) loadProducts(); 
+    } catch(err) { showToast(err.message || 'Failed to update stock', 'error'); }
+    finally { setBtnLoading('btn-submit-stock', false, 'Save Inventory'); }
+}
+
 /* ================= ORDERS & LOGISTICS ================= */
 async function openOrderModal() {
     try {
@@ -748,7 +807,10 @@ async function loadOrders() {
             if (o.payment_status === 'paid') pBadgeClass = 'success';
             if (o.payment_status === 'overdue') pBadgeClass = 'danger';
 
+            const checkboxHtml = isStaff ? `<td class="driver-hidden"><input type="checkbox" class="order-batch-cb" value="${o.id}" data-status="${o.status}" ${o.status !== 'pending' && o.status !== 'confirmed' ? 'disabled' : ''}></td>` : '';
+
             return `<tr>
+                ${checkboxHtml}
                 <td>#${o.id}</td>
                 <td>${o.customer_name}</td>
                 <td>${formatCurrency(o.total_amount)}</td>
@@ -837,6 +899,75 @@ window.payOrder = async (id) => {
         showToast(e.message || "Payment gateway unavailable", "error");
     }
 };
+
+/* ================= BATCH & ROUTING LOGIC ================= */
+function toggleBatchActions() {
+    const checked = document.querySelectorAll('.order-batch-cb:checked');
+    const actions = document.getElementById('batch-actions');
+    if (actions) {
+        if (checked.length > 0) actions.classList.remove('hidden');
+        else actions.classList.add('hidden');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const selectAll = document.getElementById('selectAllOrders');
+    if(selectAll) {
+        selectAll.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            document.querySelectorAll('.order-batch-cb:not([disabled])').forEach(cb => {
+                cb.checked = isChecked;
+            });
+            toggleBatchActions();
+        });
+    }
+
+    const tbodyOrders = document.getElementById('orders-tbody');
+    if(tbodyOrders) {
+        tbodyOrders.addEventListener('change', (e) => {
+            if (e.target.classList.contains('order-batch-cb')) {
+                toggleBatchActions();
+            }
+        });
+    }
+});
+
+async function handleOpenBatchModal() {
+    const checked = document.querySelectorAll('.order-batch-cb:checked');
+    if (checked.length === 0) return showToast("Select at least one order", "error");
+    
+    try {
+        const res = await window.UsersAPI.getAll();
+        const drivers = (res.users || []).filter(u => u.role === 'driver');
+        const sel = document.getElementById('batch-driver');
+        sel.innerHTML = '<option value="">Select Driver...</option>' + 
+            drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        openModal('modal-batch');
+    } catch(e) { showToast("Failed to load drivers", "error"); }
+}
+
+async function handleAssignBatch(e) {
+    e.preventDefault();
+    const driverId = document.getElementById('batch-driver').value;
+    const checked = Array.from(document.querySelectorAll('.order-batch-cb:checked')).map(cb => parseInt(cb.value));
+
+    if (!driverId) return showToast("Select a driver", "error");
+    if (checked.length === 0) return showToast("No orders selected", "error");
+
+    setBtnLoading('btn-submit-batch', true, 'Assigning...');
+    try {
+        await window.API.post('/batches', { driver_id: driverId, order_ids: checked });
+        showToast("Route Assigned Successfully!");
+        closeModal('modal-batch');
+        document.getElementById('selectAllOrders').checked = false;
+        toggleBatchActions();
+        loadOrders();
+    } catch(err) {
+        showToast(err.message || "Failed to assign batch", "error");
+    } finally {
+        setBtnLoading('btn-submit-batch', false, 'Send Route to Driver');
+    }
+}
 
 /* ================= PAYMENTS ================= */
 async function loadPayments() {
