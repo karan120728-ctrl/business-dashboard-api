@@ -898,6 +898,7 @@ async function loadOrders() {
                 <td>#${o.id}</td>
                 <td>${o.customer_name}</td>
                 <td>${formatCurrency(o.total_amount)}</td>
+                <td>${o.batch_id ? `<span class="badge badge-neutral" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;">Route #${o.batch_id}</span>` : '<span style="color:#d1d5db; font-size:0.8rem;">Single</span>'}</td>
                 <td>${formatDate(o.created_at)}</td>
                 <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${o.status.toUpperCase()}</span></td>
                 <td><span class="badge badge-${pBadgeClass}">${(o.payment_status || 'unpaid').toUpperCase()}</span></td>
