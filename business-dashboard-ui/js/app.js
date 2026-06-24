@@ -1054,20 +1054,25 @@ async function handleOpenBatchModal() {
 async function handleAssignBatch(e) {
     e.preventDefault();
     const driverId = document.getElementById('batch-driver').value;
-    const checked = Array.from(document.querySelectorAll('.order-batch-cb:checked')).map(cb => parseInt(cb.value));
+    const checked = Array.from(document.querySelectorAll('.order-batch-cb:checked')).map(cb => cb.value);
 
     if (!driverId) return showToast("Select a driver", "error");
     if (checked.length === 0) return showToast("No orders selected", "error");
 
     setBtnLoading('btn-submit-batch', true, 'Assigning...');
     try {
-        await window.API.post('/batches', { driver_id: driverId, order_ids: checked });
-        showToast("Route Assigned Successfully!");
+        await window.BatchesAPI.create(driverId, checked);
+        showToast("Route Assigned Successfully!", "success");
         closeModal('modal-batch');
-        document.getElementById('selectAllOrders').checked = false;
+        
+        // Reset checkbox state
+        const selectAll = document.getElementById('selectAllOrders');
+        if (selectAll) selectAll.checked = false;
+        
         toggleBatchActions();
         loadOrders();
     } catch(err) {
+        console.error("Batch Error:", err);
         showToast(err.message || "Failed to assign batch", "error");
     } finally {
         setBtnLoading('btn-submit-batch', false, 'Send Route to Driver');
@@ -1982,10 +1987,27 @@ async function handleMarkDeliveredInBatch(orderId, batchId) {
     };
 }
 
+
+function setBtnLoading(id, isLoading, text) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    if (isLoading) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${text || 'Loading...'}`;
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = text || 'Submit';
+    }
+}
+
 // Ensure BatchesAPI exists
 if (!window.BatchesAPI) {
     window.BatchesAPI = {
         getDriverBatches: () => Api.get('/batches/driver'),
-        getBatchDetails: (id) => Api.get(`/batches/${id}`)
+        getBatchDetails: (id) => Api.get(`/batches/${id}`),
+        create: (driverId, orderIds) => Api.post('/batches', { 
+            driver_id: driverId, 
+            order_ids: orderIds.map(id => parseInt(id)) 
+        })
     };
 }
