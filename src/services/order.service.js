@@ -134,7 +134,7 @@ const getOrders = async (user) => {
     const params = [businessId];
     
     if (user.role === "driver") {
-        queryStr += " AND (o.driver_id = ? OR o.status = 'out_for_delivery')";
+        queryStr += " AND o.driver_id = ?";
         params.push(user.id);
     } else if (user.role === "customer") {
         queryStr += " AND c.email = ?";
