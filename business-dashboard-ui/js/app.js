@@ -57,9 +57,9 @@ function setupUI() {
         }
     });
 
-    // Handle elements that should be hidden for drivers AND customers (admin/superadmin only)
+    // Handle elements that should be hidden ONLY for drivers
     document.querySelectorAll('.driver-hidden').forEach(el => {
-        if (role === 'driver' || role === 'customer') {
+        if (role === 'driver') {
             el.classList.add('hidden');
         } else {
             el.classList.remove('hidden');
