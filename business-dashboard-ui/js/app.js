@@ -1843,7 +1843,8 @@ async function loadBatches() {
     if (!list || !stats) return;
 
     try {
-        const batches = await window.BatchesAPI.getDriverBatches();
+        const res = await window.BatchesAPI.getDriverBatches();
+        const batches = Array.isArray(res) ? res : (res.batches || []);
         
         // Render Stats
         const total = batches.length;
@@ -1918,7 +1919,8 @@ async function loadBatches() {
 
 async function openBatchDetail(id) {
     try {
-        const orders = await window.BatchesAPI.getBatchDetails(id);
+        const res = await window.BatchesAPI.getBatchDetails(id);
+        const orders = Array.isArray(res) ? res : (res.orders || []);
         const modal = document.getElementById('modal-batch-detail');
         const titleEl = document.getElementById('batch-detail-title');
         const subtitleEl = document.getElementById('batch-detail-subtitle');
