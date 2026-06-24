@@ -83,12 +83,12 @@ const getDashboardData = async (businessId) => {
         FROM orders o
         WHERE o.business_id = ? AND o.payment_status = 'paid' AND DATE(o.delivered_at) = CURDATE()
         GROUP BY DATE_FORMAT(o.delivered_at, '%H:00')
-        ORDER BY label ASC
+        ORDER BY DATE_FORMAT(o.delivered_at, '%H:00') ASC
     `, [businessId]);
 
     // Weekly chart: Revenue per day this week (Mon–Sun)
     const [weeklySalesData] = await pool.query(`
-        SELECT DATE_FORMAT(o.delivered_at, '%a %d %b') as label, SUM(o.total_amount) as sales
+        SELECT DATE(o.delivered_at) as label, SUM(o.total_amount) as sales
         FROM orders o
         WHERE o.business_id = ?
           AND o.payment_status = 'paid'
@@ -99,7 +99,7 @@ const getDashboardData = async (businessId) => {
 
     // Monthly chart: Revenue per day over last 30 days
     const [monthlySalesData] = await pool.query(`
-        SELECT DATE_FORMAT(o.delivered_at, '%d %b') as label, SUM(o.total_amount) as sales
+        SELECT DATE(o.delivered_at) as label, SUM(o.total_amount) as sales
         FROM orders o
         WHERE o.business_id = ?
           AND o.payment_status = 'paid'
