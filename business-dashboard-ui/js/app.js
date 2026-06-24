@@ -653,8 +653,14 @@ async function openOrderModal() {
         const adminSection = document.getElementById('admin-customer-selection');
         const customerDisplay = document.getElementById('customer-info-display');
         
-        // Populate Products — include stock_quantity as data-stock
-        if (pSel) pSel.innerHTML = '<option value="" data-price="0" data-stock="-1">Select Product...</option>' + pres.products.map(p => `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock_quantity ?? -1}">${p.name} (${formatCurrency(p.price)})</option>`).join('');
+        // Populate Products — include stock_quantity as data-stock (Force numeric)
+        if (pSel) {
+            pSel.innerHTML = '<option value="" data-price="0" data-stock="-1">Select Product...</option>' + 
+                pres.products.map(p => {
+                    const s = (p.stock_quantity !== undefined && p.stock_quantity !== null) ? p.stock_quantity : -1;
+                    return `<option value="${p.id}" data-price="${p.price}" data-stock="${s}">${p.name} (${formatCurrency(p.price)})</option>`;
+                }).join('');
+        }
 
         if (currentUser.role === 'customer') {
             // Role: Customer - Auto select self
@@ -786,13 +792,26 @@ async function handleCreateOrder(e) {
 
     // Pre-flight stock check — warn BEFORE placing the order
     const selectedOpt = pSel.options[pSel.selectedIndex];
-    const stock = parseInt(selectedOpt.getAttribute('data-stock') ?? -1);
+    let stock = parseInt(selectedOpt.getAttribute('data-stock') ?? -1);
     
+    // Safety Fallback: If stock is -1, try to find it in the products list
+    if (stock === -1) {
+        try {
+            const pres = await window.ProductsAPI.getAll();
+            const p = pres.products.find(x => x.id == productId);
+            if (p) stock = p.stock_quantity;
+        } catch(err) { console.error("Fallback stock check failed", err); }
+    }
+
     console.log(`[CreateOrder] Final Check - Product: ${selectedOpt.text}, Stock: ${stock}, Requested: ${qty}`);
 
     if (stock >= 0 && qty > stock) {
         const shortage = qty - stock;
         const productName = selectedOpt.text.split(' (')[0];
+        
+        // Use a standard browser alert for visibility check
+        console.warn("STOCK SHORTAGE DETECTED! Showing modal...");
+        
         const confirmed = await new Promise(resolve => {
             showConfirmModal(
                 `⚠️ Stock Shortage: ${productName}`,
