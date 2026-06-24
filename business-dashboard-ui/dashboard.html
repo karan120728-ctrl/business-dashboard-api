@@ -162,12 +162,22 @@
                 <div class="form-group">
                     <label>Product <span class="error-text hidden" id="err-order-prod">Required</span></label>
                     <select id="order-product" class="input">
-                        <option value="" data-price="0">Select Product...</option>
+                        <option value="" data-price="0" data-stock="-1">Select Product...</option>
                     </select>
+                    <!-- Live stock availability badge -->
+                    <div id="stock-availability-hint" style="margin-top: 0.5rem; font-size: 0.8rem; display: none;"></div>
                 </div>
                 <div class="form-group">
                     <label>Quantity <span class="error-text hidden" id="err-order-qty">Must be > 0</span></label>
                     <input type="number" id="order-qty" class="input" value="1" min="1">
+                </div>
+                <!-- Low Stock Warning Banner — shown dynamically by JS -->
+                <div id="order-stock-warning" class="hidden" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b; margin-top: 2px; flex-shrink: 0;"></i>
+                    <div>
+                        <p style="margin: 0; font-weight: 600; color: #f59e0b; font-size: 0.875rem;">Stock Shortage Warning</p>
+                        <p id="order-stock-warning-msg" style="margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;"></p>
+                    </div>
                 </div>
                 <div class="form-group" style="background: var(--bg-main); padding: 1rem; border-radius: var(--radius-md); text-align: right;">
                     <p style="color: var(--text-muted); font-size: 0.875rem;">Total Amount</p>

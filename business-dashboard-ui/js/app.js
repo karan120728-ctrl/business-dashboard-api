@@ -653,8 +653,8 @@ async function openOrderModal() {
         const adminSection = document.getElementById('admin-customer-selection');
         const customerDisplay = document.getElementById('customer-info-display');
         
-        // Populate Products
-        if (pSel) pSel.innerHTML = '<option value="" data-price="0">Select Product...</option>' + pres.products.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name} (${formatCurrency(p.price)})</option>`).join('');
+        // Populate Products — include stock_quantity as data-stock
+        if (pSel) pSel.innerHTML = '<option value="" data-price="0" data-stock="-1">Select Product...</option>' + pres.products.map(p => `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock_quantity ?? -1}">${p.name} (${formatCurrency(p.price)})</option>`).join('');
 
         if (currentUser.role === 'customer') {
             // Role: Customer - Auto select self
@@ -724,13 +724,44 @@ async function openOrderModal() {
             }
         }
         
-        pSel.onchange = () => {
+        const updateOrderPreview = () => {
             const opt = pSel.options[pSel.selectedIndex];
             const price = parseFloat(opt.getAttribute('data-price') || 0);
+            const stock = parseInt(opt.getAttribute('data-stock') ?? -1);
             const qty = parseInt(document.getElementById('order-qty').value || 1);
             document.getElementById('order-total-preview').innerText = formatCurrency(price * qty);
+
+            const hint = document.getElementById('stock-availability-hint');
+            const warningBox = document.getElementById('order-stock-warning');
+            const warningMsg = document.getElementById('order-stock-warning-msg');
+
+            if (pSel.value && stock >= 0) {
+                // Show availability hint
+                hint.style.display = 'block';
+                if (stock === 0) {
+                    hint.innerHTML = `<span style="color:#ef4444; font-weight:600;"><i class="fa-solid fa-circle-xmark"></i> Out of stock</span>`;
+                } else if (qty > stock) {
+                    hint.innerHTML = `<span style="color:#f59e0b; font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> Only ${stock} in stock</span>`;
+                } else {
+                    hint.innerHTML = `<span style="color:#10b981; font-weight:600;"><i class="fa-solid fa-circle-check"></i> ${stock} available</span>`;
+                }
+
+                // Show/hide warning banner
+                if (qty > stock) {
+                    const shortage = qty - stock;
+                    warningMsg.innerText = `You are ordering ${qty} units but only ${stock} are currently in stock. The remaining ${shortage} unit(s) will be backordered — delivery may be delayed. You can still proceed if that's okay.`;
+                    warningBox.classList.remove('hidden');
+                } else {
+                    warningBox.classList.add('hidden');
+                }
+            } else {
+                hint.style.display = 'none';
+                warningBox.classList.add('hidden');
+            }
         };
-        document.getElementById('order-qty').oninput = pSel.onchange;
+
+        pSel.onchange = updateOrderPreview;
+        document.getElementById('order-qty').oninput = updateOrderPreview;
         
         openModal('modal-order');
     } catch(e) {
@@ -741,25 +772,48 @@ async function openOrderModal() {
 
 async function handleCreateOrder(e) {
     e.preventDefault();
-    const data = { 
-        customer: document.getElementById('order-customer').value, 
-        products: [{ 
-            product: document.getElementById('order-product').value, 
-            quantity: parseInt(document.getElementById('order-qty').value) 
-        }] 
-    };
-    if (!data.customer || !data.products[0].product) return showToast("Select customer and product", "error");
-    setBtnLoading('btn-submit-order', true, 'Create Order');
-    try { 
-        await window.OrdersAPI.create(data); 
-        showToast("Order Created!"); 
-        closeModal('modal-order'); 
-        loadOrders(); 
+    const customerId = document.getElementById('order-customer').value;
+    const pSel = document.getElementById('order-product');
+    const productId = pSel.value;
+    const qty = parseInt(document.getElementById('order-qty').value);
+
+    if (!customerId || !productId) return showToast("Select customer and product", "error");
+
+    // Pre-flight stock check — warn BEFORE placing the order
+    const stock = parseInt(pSel.options[pSel.selectedIndex].getAttribute('data-stock') ?? -1);
+    if (stock >= 0 && qty > stock) {
+        const shortage = qty - stock;
+        const productName = pSel.options[pSel.selectedIndex].text.split(' (')[0];
+        const confirmed = await new Promise(resolve => {
+            showConfirmModal(
+                `⚠️ Stock Shortage: ${productName}`,
+                () => resolve(true),
+                () => resolve(false),
+                `You ordered ${qty} units but only ${stock} are available right now. The missing ${shortage} unit(s) will be backordered and your delivery may be delayed. Do you want to continue?`,
+                'Yes, I accept the delay',
+                'Cancel'
+            );
+        });
+        if (!confirmed) return;
     }
-    catch(e) {
-        console.error("Order Creation Error:", e);
-        showToast(e.message || "Failed to create order", "error");
-    } finally { setBtnLoading('btn-submit-order', false, 'Create Order'); }
+
+    const data = {
+        customer: customerId,
+        products: [{ product: productId, quantity: qty }]
+    };
+
+    setBtnLoading('btn-submit-order', true, 'Create Order');
+    try {
+        await window.OrdersAPI.create(data);
+        showToast("Order Created!");
+        closeModal('modal-order');
+        loadOrders();
+    } catch(err) {
+        console.error("Order Creation Error:", err);
+        showToast(err.message || "Failed to create order", "error");
+    } finally {
+        setBtnLoading('btn-submit-order', false, 'Create Order');
+    }
 }
 
 async function loadOrders() {
@@ -1680,4 +1734,39 @@ function showToast(m, t='success') {
         setTimeout(() => el.remove(), 500);
     }, 3000); 
 }
-function showConfirmModal(m, fn) { if(confirm(m)) fn(); }
+function showConfirmModal(title, onConfirm, onCancel, message, confirmLabel, cancelLabel) {
+    const modal = document.getElementById('confirm-modal');
+    const msgEl = document.getElementById('confirm-msg');
+    const titleEl = modal ? modal.querySelector('h3') : null;
+    const confirmBtn = document.getElementById('btn-confirm');
+    const cancelBtn = document.getElementById('btn-cancel-confirm');
+
+    if (!modal || !confirmBtn || !cancelBtn) {
+        // Fallback for missing modal
+        if (confirm(message || title)) { if (onConfirm) onConfirm(); }
+        else { if (onCancel) onCancel(); }
+        return;
+    }
+
+    if (titleEl) titleEl.innerText = title || 'Are you sure?';
+    if (msgEl) msgEl.innerText = message || 'This action cannot be undone.';
+    if (confirmBtn) confirmBtn.innerText = confirmLabel || 'Yes, Proceed';
+    if (cancelBtn) cancelBtn.innerText = cancelLabel || 'Cancel';
+
+    modal.classList.remove('hidden');
+
+    // Clone to remove old listeners
+    const newConfirm = confirmBtn.cloneNode(true);
+    const newCancel = cancelBtn.cloneNode(true);
+    confirmBtn.replaceWith(newConfirm);
+    cancelBtn.replaceWith(newCancel);
+
+    newConfirm.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        if (onConfirm) onConfirm();
+    });
+    newCancel.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        if (onCancel) onCancel();
+    });
+}
