@@ -1653,7 +1653,7 @@ async function loadUsers() {
             <td><span class="badge ${u.role === 'admin' || u.role === 'superadmin' ? 'badge-warning' : 'badge-neutral'}">${u.role.toUpperCase()}</span></td>
             <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
             <td>
-                <button class="btn btn-secondary btn-sm" onclick="openEditUser(${u.id}, '${u.role}')" title="Edit User"><i class="fa-solid fa-user-pen"></i></button>
+                <button class="btn btn-secondary btn-sm" onclick="openEditUser(${u.id}, '${u.role}', ${u.is_active})" title="Edit User"><i class="fa-solid fa-user-pen"></i></button>
                 <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" style="margin-left: 5px;" title="Delete User Permanently"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>`).join('');
@@ -1678,15 +1678,22 @@ async function handleAddUser(e) {
     } catch(e) {} finally { setBtnLoading('btn-submit-user', false, 'Save User'); }
 }
 
-window.openEditUser = (id, role) => { document.getElementById('edit-user-id').value = id; document.getElementById('edit-user-role').value = role; openModal('modal-edit-user'); };
+window.openEditUser = (id, role, isActive) => { 
+    document.getElementById('edit-user-id').value = id; 
+    document.getElementById('edit-user-role').value = role; 
+    document.getElementById('edit-user-status').value = isActive ? "1" : "0";
+    openModal('modal-edit-user'); 
+};
 async function handleUpdateUserRole(e) {
     e.preventDefault();
     const id = document.getElementById('edit-user-id').value;
     const role = document.getElementById('edit-user-role').value;
+    const is_active = parseInt(document.getElementById('edit-user-status').value);
+    
     setBtnLoading('btn-update-user', true, 'Save Changes');
     try { 
-        await window.API.patch(`/users/${id}`, { role }); 
-        showToast("Role Updated!"); 
+        await window.API.patch(`/users/${id}`, { role, is_active }); 
+        showToast("User successfully updated!"); 
         closeModal('modal-edit-user'); 
         loadUsers(); 
     } catch(e) {} finally { setBtnLoading('btn-update-user', false, 'Save Changes'); }
