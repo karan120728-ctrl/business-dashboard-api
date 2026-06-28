@@ -920,20 +920,20 @@ async function loadOrders() {
             return `<tr>
                 ${checkboxHtml}
                 <td>#${o.id}</td>
-                ${isCustomer ? '' : `<td class="admin-only">${o.customer_name}</td>`}
+                ${isStaff ? `<td class="admin-only">${o.customer_name}</td>` : ''}
                 <td>${formatCurrency(o.total_amount)}</td>
-                ${isCustomer ? '' : `<td class="admin-only">${o.batch_id ? `<span class="badge badge-neutral" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;">Route #${o.batch_id}</span>` : '<span style="color:#d1d5db; font-size:0.8rem;">Single</span>'}</td>`}
+                ${isStaff ? `<td class="admin-only">${o.batch_id ? `<span class="badge badge-neutral" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;">Route #${o.batch_id}</span>` : '<span style="color:#d1d5db; font-size:0.8rem;">Single</span>'}</td>` : ''}
                 <td>${formatDate(o.created_at)}</td>
                 <td><span class="badge badge-${o.status === 'delivered' ? 'success' : (o.status === 'out_for_delivery' ? 'primary' : 'warning')}">${statusLabel}</span></td>
                 <td><span class="badge badge-${pBadgeClass}">${(o.payment_status || 'unpaid').toUpperCase()}</span></td>
-                ${isCustomer ? '' : `<td>
+                ${isStaff ? `<td>
                     <select class="input" onchange="updateOrderStatus(${o.id}, this.value, ${o.driver_id || 'null'}, '${o.status}')" ${!isStaff || o.status === 'delivered' ? 'disabled' : ''}>
                         <option value="pending" ${o.status === 'pending' ? 'selected' : ''} ${o.status !== 'pending' ? 'disabled' : ''}>Pending</option>
                         <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''} ${o.status === 'out_for_delivery' ? 'disabled' : ''}>Confirmed</option>
                         <option value="out_for_delivery" ${o.status === 'out_for_delivery' ? 'selected' : ''}>Out for Delivery</option>
                         <option value="delivered" ${o.status === 'delivered' ? 'selected' : ''}>Delivered</option>
                     </select>
-                </td>`}
+                </td>` : ''}
                 <td class="table-actions">${actions}</td>
             </tr>`;
         }).join('');
