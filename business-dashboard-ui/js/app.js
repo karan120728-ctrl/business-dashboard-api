@@ -1652,7 +1652,10 @@ async function loadUsers() {
             <td>${u.name}</td><td>${u.email}</td>
             <td><span class="badge ${u.role === 'admin' || u.role === 'superadmin' ? 'badge-warning' : 'badge-neutral'}">${u.role.toUpperCase()}</span></td>
             <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
-            <td><button class="btn btn-secondary btn-sm" onclick="openEditUser(${u.id}, '${u.role}')"><i class="fa-solid fa-user-pen"></i></button></td>
+            <td>
+                <button class="btn btn-secondary btn-sm" onclick="openEditUser(${u.id}, '${u.role}')" title="Edit User"><i class="fa-solid fa-user-pen"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" style="margin-left: 5px;" title="Delete User Permanently"><i class="fa-solid fa-trash"></i></button>
+            </td>
         </tr>`).join('');
     } catch(e) {}
 }
@@ -1689,11 +1692,49 @@ async function handleUpdateUserRole(e) {
     } catch(e) {} finally { setBtnLoading('btn-update-user', false, 'Save Changes'); }
 }
 
+window.deleteUser = async (id) => {
+    openConfirmModal("Are you sure you want to permanently delete this user?", async () => {
+        try {
+            await window.API.delete(`/users/${id}`);
+            showToast("User deleted permanently", "success");
+            loadUsers();
+        } catch (e) {
+            if (e.message && e.message.includes("historical data")) {
+                showToast("Cannot delete user with history. Please deactivate them instead.", "error");
+            } else {
+                showToast(e.message || "Failed to delete user", "error");
+            }
+        }
+    });
+};
+
+window.regenerateInviteCode = async () => {
+    openConfirmModal("Are you sure you want to regenerate the business invite code? Old codes will immediately become invalid for new signups.", async () => {
+        try {
+            const res = await window.API.post('/users/business/regenerate-code', {});
+            if (res && res.newCode) {
+                currentUser.inviteCode = res.newCode;
+                document.getElementById('display-invite-code').textContent = res.newCode;
+                showToast("Invite code regenerated successfully!", "success");
+            }
+        } catch (e) {
+            showToast(e.message || "Failed to regenerate code", "error");
+        }
+    });
+};
+
 /* ================= REAL-TIME NOTIFICATIONS ================= */
 function initNotifications() {
     if (!currentUser || !currentUser.id) return;
 
-    // 1. Connect Socket
+    // 1. Request OS Notification Permissions natively
+    if ("Notification" in window) {
+        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+    }
+
+    // 2. Connect Socket
     try {
         socket = io(window.API_URL.replace('/api', ''));
         
@@ -1707,6 +1748,14 @@ function initNotifications() {
             notifications.unshift({ ...data, is_read: 0 });
             renderNotifications();
             playNotificationSound();
+
+            // Fire OS-level Push Notification (if in background/minimized)
+            if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+                new Notification(data.title, {
+                    body: data.message,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/2830/2830305.png'
+                });
+            }
         });
     } catch(e) { console.error("Socket.io connection failed", e); }
 

@@ -80,6 +80,15 @@ const updateProductDetails = async (id, businessId, updates, io) => {
         }
     }
 
+    // 🔔 NOTIFICATION: If stock drops critically low, notify Admins using Scalable Engine
+    if (updates.stock_quantity !== undefined && updates.stock_quantity <= 5) {
+        const { dispatchNotification } = require("../utils/notificationEngine");
+        dispatchNotification('LOW_STOCK', {
+            productName: oldProduct.name,
+            currentStock: updates.stock_quantity
+        }, businessId);
+    }
+
     return true;
 };
 

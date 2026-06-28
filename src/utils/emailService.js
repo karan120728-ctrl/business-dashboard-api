@@ -85,4 +85,39 @@ function getEmailTemplate(otp, userName) {
     `;
 }
 
-module.exports = { sendOTPEmail };
+const sendTransactionalEmail = async (toEmail, subject, htmlContent) => {
+    const user = process.env.EMAIL_USER;
+    const apiKey = process.env.SENDGRID_API_KEY;
+    const smtpPass = process.env.EMAIL_PASS;
+
+    if (apiKey) {
+        sgMail.setApiKey(apiKey);
+        try {
+            await sgMail.send({ to: toEmail, from: user, subject, html: htmlContent });
+            console.log(`✅ Transactional Email sent via SendGrid to: ${toEmail}`);
+            return true;
+        } catch (error) {
+            console.error('❌ SendGrid Error:', error.message);
+            return false;
+        }
+    }
+
+    if (user && smtpPass) {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com', port: 587, secure: false,
+            auth: { user, pass: smtpPass.replace(/\s+/g, '') }
+        });
+        try {
+            await transporter.sendMail({ from: `"FlowOps Notifications" <${user}>`, to: toEmail, subject, html: htmlContent });
+            console.log(`✅ Transactional Email sent via SMTP to: ${toEmail}`);
+            return true;
+        } catch (error) {
+            console.error('❌ SMTP Error:', error.message);
+            return false;
+        }
+    }
+    console.log(`⚠️ Email sending skipped (No credentials configured) for: ${toEmail}`);
+    return false;
+};
+
+module.exports = { sendOTPEmail, sendTransactionalEmail };

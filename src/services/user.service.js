@@ -188,6 +188,31 @@ const updatePushToken = async (userId, pushToken) => {
     return true;
 };
 
+const regenerateBusinessCode = async (businessId) => {
+    const newCode = `FLOW-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    await pool.query(
+        "UPDATE businesses SET business_code = ? WHERE id = ?",
+        [newCode, businessId]
+    );
+    return newCode;
+};
+
+const deleteUser = async (userId, businessId) => {
+    try {
+        const [result] = await pool.query(
+            "DELETE FROM users WHERE id = ? AND business_id = ?",
+            [userId, businessId]
+        );
+        if (result.affectedRows === 0) throw new AppError("User not found or unauthorized", 404);
+        return true;
+    } catch (err) {
+        if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
+            throw new AppError("This user has historical data (orders, logs) and cannot be permanently deleted. Please deactivate them instead.", 400);
+        }
+        throw err;
+    }
+};
+
 module.exports = {
     createUser,
     loginUser,
@@ -195,5 +220,7 @@ module.exports = {
     resetPassword,
     getAllUsers,
     updateUser,
-    updatePushToken
+    updatePushToken,
+    regenerateBusinessCode,
+    deleteUser
 };

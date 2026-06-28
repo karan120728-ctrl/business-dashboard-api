@@ -3,6 +3,7 @@ const AppError = require("../utils/AppError");
 const { ORDER_STATUS } = require("../utils/constants");
 const notificationService = require("./notification.service");
 const invoiceService = require("./invoice.service");
+const { dispatchNotification } = require("../utils/notificationEngine");
 
 const createOrder = async (user, businessId, data, io) => {
     const { customer, products } = data;
@@ -80,16 +81,21 @@ const createOrder = async (user, businessId, data, io) => {
 
         // 🔥 Notify Admin about the new order
         try {
-            const [bRows] = await connection.query("SELECT owner_id FROM businesses WHERE id = ?", [businessId]);
             const [cRows] = await connection.query("SELECT name FROM customers WHERE id = ?", [customer]);
-            if (bRows.length > 0 && cRows.length > 0 && bRows[0].owner_id) {
-                const ownerId = bRows[0].owner_id;
-                const customerName = cRows[0].name;
+            const customerName = cRows[0]?.name || "a customer";
+            
+            // Scalable engine replaces hardcoded logic
+            dispatchNotification('ORDER_CREATED', {
+                orderId: orderId,
+                amount: totalAmount,
+                customerName: customerName
+            }, businessId);
+            
+            // Keep in-app websocket ping as well 
+            const [bRows] = await connection.query("SELECT owner_id FROM businesses WHERE id = ?", [businessId]);
+            if (bRows.length > 0 && bRows[0].owner_id) {
                 await notificationService.createNotification(
-                    io, 
-                    businessId, 
-                    ownerId, 
-                    "New Order Received! 📦", 
+                    io, businessId, bRows[0].owner_id, "New Order Received! 📦", 
                     `${customerName} just placed a new order (Order #${orderId}) for ₹${totalAmount}.`
                 );
             }
@@ -275,6 +281,13 @@ const submitProof = async (orderId, businessId, proofImage, io) => {
         }
         
         // Also notify Admin
+        // Also notify Admin
+        dispatchNotification('ORDER_DELIVERED', {
+            orderId: orderId,
+            customerName: order.email, // using email as fallback
+            driverName: order.driver_name
+        }, businessId);
+
         const [busRows] = await pool.query("SELECT owner_id FROM businesses WHERE id = ?", [businessId]);
         if (busRows.length > 0 && busRows[0].owner_id) {
             notificationService.createNotification(io, businessId, busRows[0].owner_id, "Delivery Completed ✅", `Order #${orderId} was successfully delivered and an invoice was generated.`);

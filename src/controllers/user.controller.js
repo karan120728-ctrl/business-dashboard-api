@@ -91,4 +91,28 @@ const updatePushToken = async (req, res) => {
     }
 };
 
-module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken };
+const regenerateCode = async (req, res) => {
+    try {
+        if (!req.user || req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            throw new AppError("Unauthorized", 403);
+        }
+        const newCode = await userService.regenerateBusinessCode(req.user.business_id);
+        return sendSuccess(res, 200, { newCode }, "Business code regenerated successfully");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
+const deleteUser = async (req, res) => {
+    try {
+        if (!req.user || req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            throw new AppError("Unauthorized", 403);
+        }
+        await userService.deleteUser(req.params.id, req.user.business_id);
+        return sendSuccess(res, 200, null, "User deleted successfully");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
+module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken, regenerateCode, deleteUser };
