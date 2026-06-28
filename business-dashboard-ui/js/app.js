@@ -1693,7 +1693,7 @@ async function handleUpdateUserRole(e) {
 }
 
 window.deleteUser = async (id) => {
-    openConfirmModal("Are you sure you want to permanently delete this user?", async () => {
+    showConfirmModal("Are you sure you want to permanently delete this user?", async () => {
         try {
             await window.API.delete(`/users/${id}`);
             showToast("User deleted permanently", "success");
@@ -1709,7 +1709,7 @@ window.deleteUser = async (id) => {
 };
 
 window.regenerateInviteCode = async () => {
-    openConfirmModal("Are you sure you want to regenerate the business invite code? Old codes will immediately become invalid for new signups.", async () => {
+    showConfirmModal("Are you sure you want to regenerate the business invite code? Old codes will immediately become invalid for new signups.", async () => {
         try {
             const res = await window.API.post('/users/business/regenerate-code', {});
             if (res && res.newCode) {
