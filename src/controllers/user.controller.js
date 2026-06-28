@@ -91,6 +91,19 @@ const updatePushToken = async (req, res) => {
     }
 };
 
+const savePushSubscription = async (req, res) => {
+    try {
+        const { subscription } = req.body;
+        if (!subscription || !subscription.endpoint) {
+            throw new AppError("Valid push subscription is required", 400);
+        }
+        await userService.savePushSubscription(req.user.id, subscription);
+        return sendSuccess(res, 200, null, "Push subscription saved successfully");
+    } catch (error) {
+        return sendError(res, error);
+    }
+};
+
 const regenerateCode = async (req, res) => {
     try {
         if (!req.user || req.user.role !== 'admin' && req.user.role !== 'superadmin') {
@@ -115,4 +128,4 @@ const deleteUser = async (req, res) => {
     }
 };
 
-module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken, regenerateCode, deleteUser };
+module.exports = { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken, regenerateCode, deleteUser, savePushSubscription };

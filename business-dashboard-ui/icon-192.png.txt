@@ -1,0 +1,2 @@
+// A simple 192x192 placeholder icon so notifications render on all platforms.
+// If you have a real logo, replace this file with icon-192.png

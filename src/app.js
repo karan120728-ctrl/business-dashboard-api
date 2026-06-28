@@ -169,6 +169,8 @@ app.get("/api/seed", async (req, res) => {
     // Add Security Columns to users (Direct Force)
     try { await pool.query("ALTER TABLE users ADD COLUMN reset_token_hash VARCHAR(255) NULL"); } catch(e){ console.log("reset_token_hash already exists or failed:", e.message); }
     try { await pool.query("ALTER TABLE users ADD COLUMN reset_expires TIMESTAMP NULL"); } catch(e){ console.log("reset_expires already exists or failed:", e.message); }
+    // Add Web Push Subscription column for real OS notifications
+    try { await pool.query("ALTER TABLE users ADD COLUMN push_subscription TEXT NULL"); } catch(e){ console.log("push_subscription already exists or failed:", e.message); }
 
     await pool.query("ALTER TABLE orders MODIFY status ENUM('pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled') DEFAULT 'pending'");
     

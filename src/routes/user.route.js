@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken, regenerateCode, deleteUser } = require("../controllers/user.controller");
+const { createUser, getUser, loginUser, updateUser, forgotPassword, resetPassword, updatePushToken, regenerateCode, deleteUser, savePushSubscription } = require("../controllers/user.controller");
 const auth = require("../middlewares/auth.middleware");
 const roleCheck = require("../middlewares/role.middleware");
 
@@ -20,7 +20,10 @@ router.delete("/:id", auth, deleteUser);
 // Regenerate Business Code
 router.post("/business/regenerate-code", auth, regenerateCode);
 
-// Register Push Token
+// Save Web Push Subscription (for real OS-level notifications)
+router.post("/push-subscription", auth, savePushSubscription);
+
+// Register Push Token (legacy)
 router.post("/push-token", auth, updatePushToken);
 
 // LOGIN USER

@@ -1731,22 +1731,68 @@ window.regenerateInviteCode = async () => {
 };
 
 /* ================= REAL-TIME NOTIFICATIONS ================= */
+
+// Helper: convert VAPID public key from base64url to Uint8Array
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+// Register Service Worker & Subscribe to Web Push
+async function setupWebPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log('Web Push not supported in this browser.');
+        return;
+    }
+
+    try {
+        // 1. Register service worker (relative path works for Netlify)
+        const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+        console.log('✅ Service Worker registered:', registration.scope);
+
+        // 2. Ask for permission
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            console.log('⚠️ Notification permission denied.');
+            return;
+        }
+
+        // 3. Subscribe to push
+        const vapidKey = window.VAPID_PUBLIC_KEY;
+        if (!vapidKey) return;
+
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey)
+        });
+
+        // 4. Send subscription to backend to save against this user
+        await window.API.post('/users/push-subscription', { subscription });
+        console.log('✅ Web Push subscription saved to server!');
+
+    } catch (err) {
+        console.error('❌ Web Push setup failed:', err.message);
+    }
+}
+
 function initNotifications() {
     if (!currentUser || !currentUser.id) return;
 
-    // 1. Request OS Notification Permissions natively
-    if ("Notification" in window) {
-        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-            Notification.requestPermission();
-        }
-    }
+    // 1. Setup Web Push (real OS notifications, works even when tab is closed)
+    setupWebPush();
 
-    // 2. Connect Socket
+    // 2. Connect Socket for real-time in-app updates
     try {
         socket = io(window.API_URL.replace('/api', ''));
         
         socket.on('connect', () => {
-            console.log("Real-time notifications connected.");
+            console.log("Real-time socket connected.");
             socket.emit('join', currentUser.id);
         });
 
@@ -1755,21 +1801,13 @@ function initNotifications() {
             notifications.unshift({ ...data, is_read: 0 });
             renderNotifications();
             playNotificationSound();
-
-            // Fire OS-level Push Notification (if in background/minimized)
-            if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-                new Notification(data.title, {
-                    body: data.message,
-                    icon: 'https://cdn-icons-png.flaticon.com/512/2830/2830305.png'
-                });
-            }
         });
     } catch(e) { console.error("Socket.io connection failed", e); }
 
-    // 2. Load History
+    // 3. Load History
     loadNotificationHistory();
 
-    // 3. UI Handlers
+    // 4. UI Handlers
     const trigger = document.getElementById('notification-trigger');
     const menu = document.getElementById('notification-dropdown-menu');
     const clearBtn = document.getElementById('btn-read-all');

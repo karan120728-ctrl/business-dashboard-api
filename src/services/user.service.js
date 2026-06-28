@@ -213,6 +213,14 @@ const deleteUser = async (userId, businessId) => {
     }
 };
 
+const savePushSubscription = async (userId, subscription) => {
+    await pool.query(
+        "UPDATE users SET push_subscription = ? WHERE id = ?",
+        [JSON.stringify(subscription), userId]
+    );
+    return true;
+};
+
 module.exports = {
     createUser,
     loginUser,
@@ -222,5 +230,6 @@ module.exports = {
     updateUser,
     updatePushToken,
     regenerateBusinessCode,
-    deleteUser
+    deleteUser,
+    savePushSubscription
 };
