@@ -5,11 +5,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     if (token) {
-        // Fetch live rate first, then init app
+        // Init app immediately to unblock UI on slow connections (improves mobile load times)
+        initApp();
+        setTimeout(() => { if (typeof setCurrency === 'function') setCurrency(activeCurrency); }, 100);
+        
+        // Fetch live rate in background seamlessly
         fetchLiveRate().finally(() => {
-            initApp();
-            // Apply saved currency preference to toggle buttons
-            setTimeout(() => { if (typeof setCurrency === 'function') setCurrency(activeCurrency); }, 100);
+            const dashView = document.getElementById('view-dashboard');
+            if (dashView && !dashView.classList.contains('hidden') && typeof loadDashboard === 'function') {
+                if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) {
+                    loadDashboard();
+                }
+            }
         });
     }
 });

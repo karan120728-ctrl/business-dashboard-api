@@ -18,7 +18,8 @@ const createUser = async (userData) => {
             throw new AppError("Email already registered", 400);
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Use 8 rounds (fast) instead of 10 for free-tier CPU constraints
+        const hashedPassword = await bcrypt.hash(password, 8);
         let userRole = role || 'customer';
         let businessId = null;
 
@@ -151,7 +152,7 @@ const resetPassword = async (otp, email, newPassword) => {
 
     if (users.length === 0) throw new AppError("OTP is invalid or has expired", 400);
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 8);
     await pool.query(
         "UPDATE users SET password = ?, reset_token_hash = NULL, reset_expires = NULL WHERE id = ?",
         [hashedPassword, users[0].id]

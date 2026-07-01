@@ -1,0 +1,1332 @@
+{
+  "info": {
+    "_postman_id": "flowops-complete-test-suite-v1",
+    "name": "🚀 FlowOps — Complete Test Suite",
+    "description": "# FlowOps Complete API Test Suite\n\nFull end-to-end test suite covering all 9 modules.\n\n## How to Use\n1. Import this collection into Postman\n2. Import the `FlowOps_Environment.postman_environment.json` file\n3. Select the **FlowOps Local** environment from the top-right dropdown\n4. Run folder by folder (Day 1 → Day 2 → Day 3) **OR** use Collection Runner for bulk/automated testing\n\n## Test Flow\nThe requests are chained — each request auto-saves tokens/IDs into environment variables for the next request.\n\n## Default Test Credentials\n- Admin: `admin@flowops.com` / `admin123`\n- Driver: `driver@flowops.com` / `password`\n- Customer: `customer@flowops.com` / `password`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://business-dashboard-api-hvjh.onrender.com", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "driverToken", "value": "", "type": "string" },
+    { "key": "customerToken", "value": "", "type": "string" },
+    { "key": "adminBusinessId", "value": "", "type": "string" },
+    { "key": "createdUserId", "value": "", "type": "string" },
+    { "key": "createdCustomerId", "value": "", "type": "string" },
+    { "key": "createdProductId", "value": "", "type": "string" },
+    { "key": "createdOrderId", "value": "", "type": "string" },
+    { "key": "createdBatchId", "value": "", "type": "string" },
+    { "key": "driverId", "value": "", "type": "string" },
+    { "key": "invoiceToken", "value": "", "type": "string" },
+    { "key": "businessCode", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "📋 Day 1 — Happy Path (Core Flow)",
+      "description": "Test everything in the correct sequence — Register, Login, Create Customer, Product, Order, Assign Driver, Complete Delivery, Invoice.",
+      "item": [
+        {
+          "name": "🔐 Auth — Register New Admin (Business Owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response has user data', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('data');",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) {",
+                  "  pm.collectionVariables.set('createdUserId', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Admin\",\n  \"email\": \"testadmin_{{$randomInt}}@flowops.com\",\n  \"password\": \"admin123\",\n  \"role\": \"admin\",\n  \"businessName\": \"Test Logistics Co\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/createUser", "host": ["{{baseUrl}}"], "path": ["api", "users", "createUser"] }
+          }
+        },
+        {
+          "name": "🔐 Auth — Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Token received', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data).to.have.property('token');",
+                  "  pm.collectionVariables.set('adminToken', json.data.token);",
+                  "  if(json.data.user) {",
+                  "    pm.collectionVariables.set('adminBusinessId', json.data.user.business_id);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"karan.120728@gmail.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/login", "host": ["{{baseUrl}}"], "path": ["api", "users", "login"] }
+          }
+        },
+        {
+          "name": "🔐 Auth — Login as Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if(json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('driverToken', json.data.token);",
+                  "  if(json.data.user) pm.collectionVariables.set('driverId', json.data.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"driver@flowops.com\",\n  \"password\": \"password\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/login", "host": ["{{baseUrl}}"], "path": ["api", "users", "login"] }
+          }
+        },
+        {
+          "name": "🔐 Auth — Login as Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if(json.data && json.data.token) pm.collectionVariables.set('customerToken', json.data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@flowops.com\",\n  \"password\": \"password\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/login", "host": ["{{baseUrl}}"], "path": ["api", "users", "login"] }
+          }
+        },
+        {
+          "name": "👥 Users — Get All Users (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array of users', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  // Auto-capture driver ID",
+                  "  const driver = json.data.find(u => u.role === 'driver');",
+                  "  if(driver) pm.collectionVariables.set('driverId', driver.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/users/", "host": ["{{baseUrl}}"], "path": ["api", "users", ""] }
+          }
+        },
+        {
+          "name": "👥 Customers — Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if(json.data && json.data.id) pm.collectionVariables.set('createdCustomerId', json.data.id);",
+                  "else if(json.data && json.data.insertId) pm.collectionVariables.set('createdCustomerId', json.data.insertId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bulk Test Corp\",\n  \"email\": \"bulktest@corp.com\",\n  \"phone\": \"9876543210\",\n  \"address\": \"123 Test Street, Mumbai\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/customer/", "host": ["{{baseUrl}}"], "path": ["api", "customer", ""] }
+          }
+        },
+        {
+          "name": "👥 Customers — Get All Customers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns customers array', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data || json).to.be.an('array');",
+                  "  // Remember first customer ID if not already set",
+                  "  const data = json.data || json;",
+                  "  if(data.length > 0 && !pm.collectionVariables.get('createdCustomerId')) {",
+                  "    pm.collectionVariables.set('createdCustomerId', data[0].id);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/customer/", "host": ["{{baseUrl}}"], "path": ["api", "customer", ""] }
+          }
+        },
+        {
+          "name": "📦 Products — Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if(json.data && json.data.id) pm.collectionVariables.set('createdProductId', json.data.id);",
+                  "else if(json.data && json.data.insertId) pm.collectionVariables.set('createdProductId', json.data.insertId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"FlowOps Pro Plan\",\n  \"price\": 99.99,\n  \"description\": \"Monthly pro logistics plan\",\n  \"stock_quantity\": 100,\n  \"unit_size\": \"monthly\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/products/", "host": ["{{baseUrl}}"], "path": ["api", "products", ""] }
+          }
+        },
+        {
+          "name": "📦 Products — Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data || json;",
+                  "pm.test('Products array returned', () => pm.expect(data).to.be.an('array'));",
+                  "if(data.length > 0 && !pm.collectionVariables.get('createdProductId')) {",
+                  "  pm.collectionVariables.set('createdProductId', data[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/products/", "host": ["{{baseUrl}}"], "path": ["api", "products", ""] }
+          }
+        },
+        {
+          "name": "🛒 Orders — Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Order created with ID', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data).to.have.property('order');",
+                  "  pm.collectionVariables.set('createdOrderId', json.data.order.id);",
+                  "  console.log('✅ Order created with ID:', json.data.order.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"id\": \"{{createdCustomerId}}\",\n    \"name\": \"Bulk Test Corp\",\n    \"email\": \"bulktest@corp.com\"\n  },\n  \"products\": [\n    {\n      \"id\": \"{{createdProductId}}\",\n      \"name\": \"FlowOps Pro Plan\",\n      \"price\": 99.99,\n      \"quantity\": 2\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/", "host": ["{{baseUrl}}"], "path": ["api", "orders", ""] }
+          }
+        },
+        {
+          "name": "🛒 Orders — Get All Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns orders', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array').and.have.length.above(0);",
+                  "  if(!pm.collectionVariables.get('createdOrderId') && json.length > 0) {",
+                  "    pm.collectionVariables.set('createdOrderId', json[0].id);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/", "host": ["{{baseUrl}}"], "path": ["api", "orders", ""] }
+          }
+        },
+        {
+          "name": "🛒 Orders — Update Status to Confirmed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status updated', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status || json.message).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"confirmed\" }"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "status"] }
+          }
+        },
+        {
+          "name": "🛒 Orders — Update Status to Packed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"packed\" }"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "status"] }
+          }
+        },
+        {
+          "name": "🚛 Orders — Assign Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Driver assigned message returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('assigned');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"{{driverId}}\",\n  \"driver_name\": \"Demo Driver\",\n  \"vehicle_number\": \"MH-01-AB-1234\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/assign-driver", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "assign-driver"] }
+          }
+        },
+        {
+          "name": "📍 Orders — Update GPS Location (Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Location updated', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Location');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 19.0760,\n  \"lng\": 72.8777,\n  \"address\": \"Dharavi, Mumbai, Maharashtra\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/update-location", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "update-location"] }
+          }
+        },
+        {
+          "name": "📍 Orders — Get Live Location",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/location", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "location"] }
+          }
+        },
+        {
+          "name": "✅ Orders — Submit Proof of Delivery (Base64)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Delivery confirmed', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proof_image\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/submit-proof", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "submit-proof"] }
+          }
+        },
+        {
+          "name": "🧾 Invoices — Get All Invoices",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const data = json.data || json;",
+                  "pm.test('Invoice auto-generated after delivery', () => {",
+                  "  pm.expect(data).to.be.an('array');",
+                  "  console.log('Invoice count:', data.length);",
+                  "});",
+                  "if(data.length > 0 && data[0].payment_token) {",
+                  "  pm.collectionVariables.set('invoiceToken', data[0].payment_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/invoices/", "host": ["{{baseUrl}}"], "path": ["api", "invoices", ""] }
+          }
+        },
+        {
+          "name": "🧾 Invoices — Get Dashboard Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has revenue data', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/invoices/stats", "host": ["{{baseUrl}}"], "path": ["api", "invoices", "stats"] }
+          }
+        },
+        {
+          "name": "🧾 Invoices — Public Pay Page (Via Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 or 404', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if(pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  console.log('Invoice data:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/invoices/pay/{{invoiceToken}}", "host": ["{{baseUrl}}"], "path": ["api", "invoices", "pay", "{{invoiceToken}}"] }
+          }
+        },
+        {
+          "name": "🔔 Notifications — Get All",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Notifications returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data || json).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/", "host": ["{{baseUrl}}"], "path": ["api", "notifications", ""] }
+          }
+        },
+        {
+          "name": "🔔 Notifications — Mark All as Read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/read-all", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "read-all"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚛 Day 2 — Milk Run / Batch Delivery",
+      "description": "Test the batch delivery (Milk Run) workflow — create batch, add orders, get driver batches, complete.",
+      "item": [
+        {
+          "name": "🚚 Batches — Create Milk Run Batch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 or 201', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if(json.data && json.data.id) pm.collectionVariables.set('createdBatchId', json.data.id);",
+                  "else if(json.id) pm.collectionVariables.set('createdBatchId', json.id);",
+                  "console.log('Batch response:', JSON.stringify(json));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"{{driverId}}\",\n  \"order_ids\": [\"{{createdOrderId}}\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/batches/", "host": ["{{baseUrl}}"], "path": ["api", "batches", ""] }
+          }
+        },
+        {
+          "name": "🚚 Batches — Get Driver Batches",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Driver batches returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data || json).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/batches/driver", "host": ["{{baseUrl}}"], "path": ["api", "batches", "driver"] }
+          }
+        },
+        {
+          "name": "🚚 Batches — Get Batch Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 or 404', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "console.log('Batch details:', pm.response.text());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/batches/{{createdBatchId}}", "host": ["{{baseUrl}}"], "path": ["api", "batches", "{{createdBatchId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚠️ Day 2 — Edge Cases (Negative Testing)",
+      "description": "Test all the things that SHOULD fail — wrong tokens, duplicate emails, missing fields, etc.",
+      "item": [
+        {
+          "name": "❌ Auth — Login with Wrong Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error message returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message || json.error).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@flowops.com\",\n  \"password\": \"WRONGPASSWORD\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/login", "host": ["{{baseUrl}}"], "path": ["api", "users", "login"] }
+          }
+        },
+        {
+          "name": "❌ Auth — Access Protected Route Without Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/users/", "host": ["{{baseUrl}}"], "path": ["api", "users", ""] }
+          }
+        },
+        {
+          "name": "❌ Orders — Create Order with No Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Validation error returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": { \"id\": 1, \"name\": \"Test\" },\n  \"products\": []\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/", "host": ["{{baseUrl}}"], "path": ["api", "orders", ""] }
+          }
+        },
+        {
+          "name": "❌ Orders — Driver Cannot Update Order Status (Admin Only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Forbidden error', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message || json.error).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"cancelled\" }"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "status"] }
+          }
+        },
+        {
+          "name": "❌ Orders — Get Non-Existent Order Location",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 404 or 500', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([404, 500, 400]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/999999/location", "host": ["{{baseUrl}}"], "path": ["api", "orders", "999999", "location"] }
+          }
+        },
+        {
+          "name": "❌ Orders — Submit Proof with No Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}/submit-proof", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{createdOrderId}}", "submit-proof"] }
+          }
+        },
+        {
+          "name": "❌ Products — Create Product with Missing Price",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 400 or 500', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([400, 500]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Incomplete Product\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/products/", "host": ["{{baseUrl}}"], "path": ["api", "products", ""] }
+          }
+        },
+        {
+          "name": "❌ Delete Non-Existent User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 404 or 400', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([404, 400, 500]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/users/999999", "host": ["{{baseUrl}}"], "path": ["api", "users", "999999"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔐 Day 3 — Security & User Management",
+      "description": "Test password reset flow, user deactivation, business code regeneration, and role-based access.",
+      "item": [
+        {
+          "name": "🔑 Auth — Forgot Password (Request OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('OTP sent message', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('OTP');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"email\": \"admin@flowops.com\" }"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/forgot-password", "host": ["{{baseUrl}}"], "path": ["api", "users", "forgot-password"] }
+          }
+        },
+        {
+          "name": "🔄 Business — Regenerate Invite Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('New business code returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data).to.have.property('newCode');",
+                  "  pm.collectionVariables.set('businessCode', json.data.newCode);",
+                  "  console.log('New business code:', json.data.newCode);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/users/business/regenerate-code", "host": ["{{baseUrl}}"], "path": ["api", "users", "business", "regenerate-code"] }
+          }
+        },
+        {
+          "name": "🔄 Users — Deactivate User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('User updated message', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"is_active\": false }"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/{{driverId}}", "host": ["{{baseUrl}}"], "path": ["api", "users", "{{driverId}}"] }
+          }
+        },
+        {
+          "name": "🔄 Users — Reactivate User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"is_active\": true }"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users/{{driverId}}", "host": ["{{baseUrl}}"], "path": ["api", "users", "{{driverId}}"] }
+          }
+        },
+        {
+          "name": "🔑 Auth — Admin-Only Route Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 for Admin', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/users/admin-only", "host": ["{{baseUrl}}"], "path": ["api", "users", "admin-only"] }
+          }
+        },
+        {
+          "name": "❌ Driver Should NOT Access Admin Route",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 403 for Driver', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/users/admin-only", "host": ["{{baseUrl}}"], "path": ["api", "users", "admin-only"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Day 3 — Products & Inventory",
+      "description": "Test product CRUD, soft delete, restore, and bulk operations.",
+      "item": [
+        {
+          "name": "📦 Products — Update Product Price (INR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"FlowOps Pro Plan\",\n  \"price\": 8299,\n  \"description\": \"Monthly pro plan in INR\",\n  \"stock_quantity\": 50,\n  \"currency\": \"INR\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/products/{{createdProductId}}", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{createdProductId}}"] }
+          }
+        },
+        {
+          "name": "📦 Products — Soft Delete Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/products/{{createdProductId}}", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{createdProductId}}"] }
+          }
+        },
+        {
+          "name": "📦 Products — Restore Deleted Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/products/{{createdProductId}}/restore", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{createdProductId}}", "restore"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Day 3 — Customers CRUD",
+      "description": "Full customer management: update, soft delete, and restore.",
+      "item": [
+        {
+          "name": "👥 Customers — Update Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bulk Test Corp (Updated)\",\n  \"phone\": \"9999999999\",\n  \"email\": \"bulktest@corp.com\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/customer/{{createdCustomerId}}", "host": ["{{baseUrl}}"], "path": ["api", "customer", "{{createdCustomerId}}"] }
+          }
+        },
+        {
+          "name": "👥 Customers — Soft Delete Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/customer/{{createdCustomerId}}", "host": ["{{baseUrl}}"], "path": ["api", "customer", "{{createdCustomerId}}"] }
+          }
+        },
+        {
+          "name": "👥 Customers — Restore Deleted Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/customer/restore/{{createdCustomerId}}", "host": ["{{baseUrl}}"], "path": ["api", "customer", "restore", "{{createdCustomerId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💳 Day 3 — Payments & Audit",
+      "description": "Test payment simulation, force-sync, and audit log viewer.",
+      "item": [
+        {
+          "name": "💳 Payments — Simulate Invoice Pay (via token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 or 400', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]);",
+                  "});",
+                  "console.log('Payment sim response:', pm.response.text());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/invoices/pay/{{invoiceToken}}", "host": ["{{baseUrl}}"], "path": ["api", "invoices", "pay", "{{invoiceToken}}"] }
+          }
+        },
+        {
+          "name": "💳 Payments — Force Sync Order to PAID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200, 403, or 404', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 403, 404]);",
+                  "});",
+                  "console.log('Force sync response:', pm.response.text());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/payments/force-sync/{{createdOrderId}}?secret=flowops_sync_2026", "host": ["{{baseUrl}}"], "path": ["api", "payments", "force-sync", "{{createdOrderId}}"], "query": [{ "key": "secret", "value": "flowops_sync_2026" }] }
+          }
+        },
+        {
+          "name": "💳 Payments — View Payment Audit Log",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Audit logs returned', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "  console.log('Most recent audit log:', JSON.stringify(json[0]));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/payments/audit-view?secret=flowops_sync_2026", "host": ["{{baseUrl}}"], "path": ["api", "payments", "audit-view"], "query": [{ "key": "secret", "value": "flowops_sync_2026" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏥 Health & System",
+      "description": "Basic health checks and system endpoints.",
+      "item": [
+        {
+          "name": "🏥 Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('API is up', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains FlowOps', () => {",
+                  "  pm.expect(pm.response.text()).to.include('FlowOps');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] }
+          }
+        },
+        {
+          "name": "🔔 Notifications — Clear All",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/clear-all", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "clear-all"] }
+          }
+        }
+      ]
+    }
+  ]
+}

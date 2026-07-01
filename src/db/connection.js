@@ -13,6 +13,8 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 
   // TiDB Cloud requires SSL. On cloud servers (Railway/Render), rejectUnauthorized:false
   // is needed because the cert chain may not be fully trusted in the container environment.
