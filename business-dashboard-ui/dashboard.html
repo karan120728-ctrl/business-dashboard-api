@@ -7,11 +7,13 @@
     <link rel="stylesheet" href="css/styles.css">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Instant Auth Check -> Prevents rendering unauthorized content -->
+    <script>if(!localStorage.getItem('flowops_token')) window.location.replace('login.html');</script>
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Leaflet.js for Live Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
     <!-- Toast Container -->
@@ -263,7 +265,7 @@
     <div id="sidebar-overlay" class="sidebar-overlay hidden"></div>
 
     <!-- Layout -->
-    <div id="app-layout" class="layout hidden">
+    <div id="app-layout" class="layout">
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -784,18 +786,18 @@
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/api/base.js"></script>
-    <script src="js/api/auth.js"></script>
-    <script src="js/api/customers.js"></script>
-    <script src="js/api/products.js"></script>
-    <script src="js/api/orders.js"></script>
-    <script src="js/api/invoices.js"></script>
-    <script src="js/api/users.js"></script>
-    <script src="js/api/analytics.js"></script>
-    <script src="js/app.js"></script>
+    <script defer src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script defer src="js/config.js"></script>
+    <script defer src="js/utils.js"></script>
+    <script defer src="js/api/base.js"></script>
+    <script defer src="js/api/auth.js"></script>
+    <script defer src="js/api/customers.js"></script>
+    <script defer src="js/api/products.js"></script>
+    <script defer src="js/api/orders.js"></script>
+    <script defer src="js/api/invoices.js"></script>
+    <script defer src="js/api/users.js"></script>
+    <script defer src="js/api/analytics.js"></script>
+    <script defer src="js/app.js"></script>
     <!-- Generic Confirmation Modal -->
     <div id="confirm-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 400px; text-align: center; padding: 2rem;">
