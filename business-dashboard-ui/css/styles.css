@@ -813,6 +813,76 @@ body.sidebar-open .main-content {
     100% { transform: scale(1); }
 }
 
+/* ================== TIMELINE ================== */
+.timeline-item {
+    position: relative;
+    padding-left: 45px;
+    margin-bottom: 1.5rem;
+}
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 40px;
+    bottom: -15px;
+    width: 2px;
+    background: var(--border);
+    z-index: 1;
+}
+.timeline-item:last-child::before {
+    display: none;
+}
+.timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.timeline-content {
+    background: rgba(0,0,0,0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+}
+.timeline-item.active .timeline-content {
+    background: #fff;
+    border-left: 3px solid var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+.timeline-header h5 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+.timeline-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.timeline-desc {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
 /* ================== MEDIA QUERIES ================== */
 
 /* Tablet (Portrait) */
