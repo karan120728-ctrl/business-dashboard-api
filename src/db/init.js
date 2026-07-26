@@ -179,6 +179,11 @@ const initDB = async () => {
     try { await connection.query("ALTER TABLE mobile_error_logs ADD COLUMN user_role VARCHAR(50) NULL;"); } catch(e){}
     try { await connection.query("ALTER TABLE mobile_error_logs ADD COLUMN api_details TEXT NULL;"); } catch(e){}
 
+    // Adding Performance Indexes for Dashboard Queries
+    try { await connection.query("CREATE INDEX idx_orders_dashboard ON orders(business_id, payment_status, delivered_at)"); } catch(e){}
+    try { await connection.query("CREATE INDEX idx_orders_status ON orders(business_id, status)"); } catch(e){}
+    try { await connection.query("CREATE INDEX idx_invoices_status ON invoices(business_id, status)"); } catch(e){}
+    
     console.log("Multi-Tenant Database tables initialized successfully.");
     connection.release();
   } catch (error) {
