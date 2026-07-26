@@ -892,6 +892,9 @@ async function handleCreateOrder(e) {
         // Use a standard browser alert for visibility check
         console.warn("STOCK SHORTAGE DETECTED! Showing modal...");
         
+        // Hide the order modal so the driver delay modal is clearly visible alone
+        closeModal('modal-order');
+        
         const confirmed = await new Promise(resolve => {
             showConfirmModal(
                 `⚠️ Stock Shortage: ${productName}`,
@@ -904,7 +907,11 @@ async function handleCreateOrder(e) {
         });
         
         console.log(`[CreateOrder] Confirmation result: ${confirmed}`);
-        if (!confirmed) return;
+        if (!confirmed) {
+            // Restore the order modal if they cancelled
+            openModal('modal-order');
+            return;
+        }
     }
 
     const data = {
