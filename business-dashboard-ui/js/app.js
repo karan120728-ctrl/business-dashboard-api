@@ -5,19 +5,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     if (token) {
-        // Init app immediately to unblock UI on slow connections (improves mobile load times)
-        initApp();
-        setTimeout(() => { if (typeof setCurrency === 'function') setCurrency(activeCurrency); }, 100);
+        // Fetch live rate completely in the background without blocking the UI
+        fetchLiveRate();
         
-        // Fetch live rate in background seamlessly
-        fetchLiveRate().finally(() => {
-            const dashView = document.getElementById('view-dashboard');
-            if (dashView && !dashView.classList.contains('hidden') && typeof loadDashboard === 'function') {
-                if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin')) {
-                    loadDashboard();
-                }
+        // Init app immediately to unblock UI
+        initApp();
+        
+        // Set currency UI without triggering a redundant dashboard reload
+        setTimeout(() => {
+            const usdBtn = document.getElementById('btn-currency-usd');
+            const inrBtn = document.getElementById('btn-currency-inr');
+            if (activeCurrency === 'USD' && usdBtn) {
+                usdBtn.style.background = 'var(--primary)';
+                usdBtn.style.color = '#fff';
+                if(inrBtn) { inrBtn.style.background = 'transparent'; inrBtn.style.color = 'var(--text-muted)'; }
+            } else if (activeCurrency === 'INR' && inrBtn) {
+                inrBtn.style.background = 'var(--primary)';
+                inrBtn.style.color = '#fff';
+                if(usdBtn) { usdBtn.style.background = 'transparent'; usdBtn.style.color = 'var(--text-muted)'; }
             }
-        });
+        }, 100);
     }
 });
 
