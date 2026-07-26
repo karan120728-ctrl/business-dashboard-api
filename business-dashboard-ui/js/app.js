@@ -436,16 +436,53 @@ async function loadDashboard() {
         dashboardChartData = data.charts;
         
         // Preserve current selection during auto-refresh
-        const currentSelection = document.getElementById('sales-chart-period') ? document.getElementById('sales-chart-period').value : 'monthly';
-        renderSalesChart(currentSelection || 'monthly');
+        let currentSelection = 'monthly';
+        const activeBtn = document.querySelector('#sales-chart-period-toggle .active');
+        if (activeBtn) currentSelection = activeBtn.getAttribute('data-val');
+        
+        renderSalesChart(currentSelection);
         renderStatusChart();
 
-        const toggle = document.getElementById('sales-chart-period');
-        if (toggle) {
-            const newToggle = toggle.cloneNode(true);
-            newToggle.value = currentSelection || 'monthly'; // Force value to match state after cloning
-            toggle.parentNode.replaceChild(newToggle, toggle);
-            newToggle.addEventListener('change', (e) => renderSalesChart(e.target.value));
+        const toggleContainer = document.getElementById('sales-chart-period-toggle');
+        if (toggleContainer) {
+            // Re-assign listeners to avoid duplication during auto-refresh
+            const buttons = toggleContainer.querySelectorAll('.chart-toggle-btn');
+            buttons.forEach(btn => {
+                // Ensure correct state visually during re-render
+                if (btn.getAttribute('data-val') === currentSelection) {
+                    btn.classList.add('active');
+                    btn.style.background = 'white';
+                    btn.style.color = 'var(--primary)';
+                    btn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.background = 'transparent';
+                    btn.style.color = 'var(--text-muted)';
+                    btn.style.boxShadow = 'none';
+                }
+                
+                // Remove old event listeners via cloning approach (same as before)
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                
+                newBtn.addEventListener('click', (e) => {
+                    // Reset all
+                    toggleContainer.querySelectorAll('.chart-toggle-btn').forEach(b => {
+                        b.classList.remove('active');
+                        b.style.background = 'transparent';
+                        b.style.color = 'var(--text-muted)';
+                        b.style.boxShadow = 'none';
+                    });
+                    // Set active
+                    const t = e.target;
+                    t.classList.add('active');
+                    t.style.background = 'white';
+                    t.style.color = 'var(--primary)';
+                    t.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                    // Render
+                    renderSalesChart(t.getAttribute('data-val'));
+                });
+            });
         }
     } catch(err) { console.error(err); }
 }

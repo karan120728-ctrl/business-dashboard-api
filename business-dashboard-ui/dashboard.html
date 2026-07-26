@@ -402,11 +402,11 @@
                         <div class="chart-card">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                 <h3>Sales Overview</h3>
-                                <select id="sales-chart-period" style="appearance: none; background-color: white; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 20px; padding: 0.4rem 2rem 0.4rem 1rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; outline: none; background-image: url('data:image/svg+xml;utf8,<svg fill=%22%239CA3AF%22 height=%2224%22 viewBox=%220 0 24 24%22 width=%2224%22 xmlns=%22http://www.w3.org/2000/svg%22><path d=%22M7 10l5 5 5-5z%22/></svg>'); background-repeat: no-repeat; background-position: right 0.3rem center; background-size: 1.2rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: border-color 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(79, 70, 229, 0.1)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.boxShadow='0 1px 2px rgba(0,0,0,0.05)';">
-                                    <option value="daily">Daily View</option>
-                                    <option value="weekly">Weekly View</option>
-                                    <option value="monthly" selected>Monthly View</option>
-                                </select>
+                                <div id="sales-chart-period-toggle" style="display: flex; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; padding: 2px;">
+                                    <button class="chart-toggle-btn" data-val="daily" style="flex: 1; padding: 0.4rem 1rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s;">Daily</button>
+                                    <button class="chart-toggle-btn" data-val="weekly" style="flex: 1; padding: 0.4rem 1rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s;">Weekly</button>
+                                    <button class="chart-toggle-btn active" data-val="monthly" style="flex: 1; padding: 0.4rem 1rem; border: none; background: white; color: var(--primary); font-size: 0.8rem; font-weight: 600; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; transition: all 0.2s;">Monthly</button>
+                                </div>
                             </div>
                             <div style="position: relative; height: 300px; width: 100%;">
                                 <canvas id="salesChart"></canvas>
