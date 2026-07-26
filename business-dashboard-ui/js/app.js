@@ -434,12 +434,16 @@ async function loadDashboard() {
 
         document.querySelectorAll('.skeleton-text').forEach(el => el.classList.remove('skeleton-text'));
         dashboardChartData = data.charts;
-        renderSalesChart('monthly');
+        
+        // Preserve current selection during auto-refresh
+        const currentSelection = document.getElementById('sales-chart-period') ? document.getElementById('sales-chart-period').value : 'monthly';
+        renderSalesChart(currentSelection || 'monthly');
         renderStatusChart();
 
         const toggle = document.getElementById('sales-chart-period');
         if (toggle) {
             const newToggle = toggle.cloneNode(true);
+            newToggle.value = currentSelection || 'monthly'; // Force value to match state after cloning
             toggle.parentNode.replaceChild(newToggle, toggle);
             newToggle.addEventListener('change', (e) => renderSalesChart(e.target.value));
         }
