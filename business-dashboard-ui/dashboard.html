@@ -786,18 +786,35 @@
         </div>
     </div>
 
-    <script defer src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script defer src="js/config.js"></script>
-    <script defer src="js/utils.js"></script>
-    <script defer src="js/api/base.js"></script>
-    <script defer src="js/api/auth.js"></script>
-    <script defer src="js/api/customers.js"></script>
-    <script defer src="js/api/products.js"></script>
-    <script defer src="js/api/orders.js"></script>
-    <script defer src="js/api/invoices.js"></script>
-    <script defer src="js/api/users.js"></script>
-    <script defer src="js/api/analytics.js"></script>
-    <script defer src="js/app.js"></script>
+    <!-- App scripts: loaded immediately, NOT blocked by any CDN -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api/base.js"></script>
+    <script src="js/api/auth.js"></script>
+    <script src="js/api/customers.js"></script>
+    <script src="js/api/products.js"></script>
+    <script src="js/api/orders.js"></script>
+    <script src="js/api/invoices.js"></script>
+    <script src="js/api/users.js"></script>
+    <script src="js/api/analytics.js"></script>
+    <script src="js/app.js"></script>
+    <!-- Socket.IO: loaded async AFTER app init, from our own server to avoid CDN timeouts -->
+    <script>
+        (function loadSocketIO() {
+            const s = document.createElement('script');
+            // Use our own API server to serve the socket.io client — no CDN dependency
+            s.src = (window.API_URL || '').replace('/api', '') + '/socket.io/socket.io.js';
+            s.async = true;
+            s.onload = function() {
+                // Socket.io is now available — connect if the user is already logged in
+                if (typeof initSocketConnection === 'function') initSocketConnection();
+            };
+            s.onerror = function() {
+                console.warn('Socket.IO failed to load. Real-time notifications will be unavailable.');
+            };
+            document.body.appendChild(s);
+        })();
+    </script>
     <!-- Generic Confirmation Modal -->
     <div id="confirm-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 400px; text-align: center; padding: 2rem;">

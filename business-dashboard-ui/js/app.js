@@ -1801,22 +1801,9 @@ function initNotifications() {
     // 1. Setup Web Push (real OS notifications, works even when tab is closed)
     setupWebPush();
 
-    // 2. Connect Socket for real-time in-app updates
-    try {
-        socket = io(window.API_URL.replace('/api', ''));
-        
-        socket.on('connect', () => {
-            console.log("Real-time socket connected.");
-            socket.emit('join', currentUser.id);
-        });
-
-        socket.on('notification', (data) => {
-            showToast(`🔔 ${data.title}: ${data.message}`);
-            notifications.unshift({ ...data, is_read: 0 });
-            renderNotifications();
-            playNotificationSound();
-        });
-    } catch(e) { console.error("Socket.io connection failed", e); }
+    // 2. Socket connection is handled separately by initSocketConnection()
+    //    which is called only AFTER socket.io client script is confirmed loaded.
+    //    This prevents the ReferenceError: io is not defined crash.
 
     // 3. Load History
     loadNotificationHistory();
@@ -1847,6 +1834,25 @@ function initNotifications() {
             } catch(e) {}
         };
     }
+}
+
+// Called by the async socket.io loader in dashboard.html AFTER the script loads successfully.
+// This is completely decoupled from the UI init flow so a CDN timeout never blocks the dashboard.
+function initSocketConnection() {
+    if (!currentUser || !currentUser.id || typeof io === 'undefined') return;
+    try {
+        socket = io(window.API_URL.replace('/api', ''));
+        socket.on('connect', () => {
+            console.log("Real-time socket connected.");
+            socket.emit('join', currentUser.id);
+        });
+        socket.on('notification', (data) => {
+            showToast(`🔔 ${data.title}: ${data.message}`);
+            notifications.unshift({ ...data, is_read: 0 });
+            renderNotifications();
+            playNotificationSound();
+        });
+    } catch(e) { console.error("Socket.io connection failed", e); }
 }
 
 async function loadNotificationHistory() {
