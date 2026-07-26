@@ -428,9 +428,9 @@ async function loadDashboard() {
         setVal('metric-weekly', formatCurrency(data.weeklyRevenue));
         setVal('metric-monthly', formatCurrency(data.monthlyRevenue));
         
-        renderGrowth('growth-today', data.todayGrowth);
-        renderGrowth('growth-weekly', data.weeklyGrowth);
-        renderGrowth('growth-monthly', data.monthlyGrowth);
+        renderGrowth('growth-today', data.todayGrowth, data.todayRevenue);
+        renderGrowth('growth-weekly', data.weeklyGrowth, data.weeklyRevenue);
+        renderGrowth('growth-monthly', data.monthlyGrowth, data.monthlyRevenue);
 
         document.querySelectorAll('.skeleton-text').forEach(el => el.classList.remove('skeleton-text'));
         dashboardChartData = data.charts;
@@ -446,11 +446,16 @@ async function loadDashboard() {
     } catch(err) { console.error(err); }
 }
 
-function renderGrowth(elementId, value) {
+function renderGrowth(elementId, value, currentRevenue) {
     const el = document.getElementById(elementId);
     if (!el) return;
     const num = parseFloat(value);
-    if (isNaN(num) || num === 0) {
+    // If current period has zero revenue, never show a scary negative %
+    // Just show a neutral 'No sales yet' message
+    if (parseFloat(currentRevenue) === 0) {
+        el.innerHTML = `<i class="fa-solid fa-minus"></i> No sales yet`;
+        el.className = 'growth-indicator growth-neutral';
+    } else if (isNaN(num) || num === 0) {
         el.innerHTML = `No change`;
         el.className = 'growth-indicator growth-neutral';
     } else if (num > 0) {
