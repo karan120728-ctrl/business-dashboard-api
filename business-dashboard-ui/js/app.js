@@ -1403,7 +1403,7 @@ window.openImagePreview = (src, caption) => {
 window.openAssignDriver = async (id) => {
     document.getElementById('assign-driver-order-id').value = id;
     const users = await window.UsersAPI.getAll();
-    const drivers = (Array.isArray(users) ? users : (users.users || [])).filter(u => u.role === 'driver' && u.status !== 'inactive');
+    const drivers = (Array.isArray(users) ? users : (users.users || [])).filter(u => u.role === 'driver' && u.is_active !== 0);
     const sel = document.getElementById('driver-selection');
     
     sel.innerHTML = '<option value="">Select Driver...</option>' + 
